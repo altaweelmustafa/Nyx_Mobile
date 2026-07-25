@@ -1,0 +1,138 @@
+class MockTrack {
+  final String id;
+  final String title;
+  final String artist;
+  final String song;
+  bool liked;
+
+  MockTrack({
+    required this.id,
+    required this.title,
+    required this.artist,
+    required this.song,
+    this.liked = false,
+  });
+}
+
+class MockPlaylist {
+  final String id;
+  final String name;
+  final int trackCount;
+  final int likes;
+  final List<MockTrack> tracks;
+
+  MockPlaylist({
+    required this.id,
+    required this.name,
+    required this.trackCount,
+    required this.likes,
+    required this.tracks,
+  });
+}
+
+// ── Tracks ────────────────────────────────────────────────────────────────────
+
+final mockTracks = [
+  MockTrack(
+    id: '1',
+    title: 'Summertime Sadness',
+    artist: 'Lana Del Rey',
+    song: 'SONG',
+    liked: true,
+  ),
+  MockTrack(
+    id: '2',
+    title: 'Say Yes To Heaven',
+    artist: 'Lana Del Rey',
+    song: 'SONG',
+    liked: false,
+  ),
+  MockTrack(
+    id: '3',
+    title: 'Born To Die',
+    artist: 'Lana Del Rey',
+    song: 'SONG',
+    liked: false,
+  ),
+  MockTrack(
+    id: '4',
+    title: 'On My Way',
+    artist: 'Alan Walker & Sabrina Carpenter',
+    song: 'SONG',
+    liked: true,
+  ),
+  MockTrack(
+    id: '5',
+    title: 'Rotana FM',
+    artist: '90.1 FM - EGYPT',
+    song: 'RADIO',
+    liked: false,
+  ),
+];
+
+// ── Playlists ─────────────────────────────────────────────────────────────────
+
+final mockPlaylists = [
+  MockPlaylist(
+    id: 'p1',
+    name: 'Playlist #1',
+    trackCount: 13,
+    likes: 7,
+    tracks: [mockTracks[0], mockTracks[1], mockTracks[2]],
+  ),
+  MockPlaylist(
+    id: 'p2',
+    name: 'Playlist #2',
+    trackCount: 5,
+    likes: 4,
+    tracks: [mockTracks[3]],
+  ),
+  MockPlaylist(
+    id: 'p3',
+    name: 'Study',
+    trackCount: 9,
+    likes: 5,
+    tracks: [mockTracks[0], mockTracks[3]],
+  ),
+];
+
+// ── Search history ────────────────────────────────────────────────────────────
+
+final mockSearchHistory = [
+  'Lana Del Rey',
+  '505',
+  'Do you love me back',
+  'لما قلبي يدق بغار عليك',
+];
+
+// ── For You cards ─────────────────────────────────────────────────────────────
+
+final mockForYouCards = ['history', 'most played', '2022 hit'];
+
+// ── Suggestion genres ─────────────────────────────────────────────────────────
+
+final mockSuggestions = ['SM5A FM', 'Jazz', 'Spanish'];
+
+// ── Lyrics ────────────────────────────────────────────────────────────────────
+
+final mockLyrics = [
+  LyricLine(text: "So then, when I'm finished", isActive: false),
+  LyricLine(text: "I'm all 'bout my business and", isActive: false),
+  LyricLine(text: "ready to save the world", isActive: false),
+  LyricLine(text: "I'm taking my misery, make it my bitch", isActive: false),
+  LyricLine(text: "Can't be everyone's favorite girl", isActive: false),
+  LyricLine(text: "So take aim and fire away", isActive: true),
+  LyricLine(text: "I've never been so wide awake", isActive: false),
+  LyricLine(text: "No, nobody but me can keep me safe", isActive: false),
+  LyricLine(text: "And I'm on my way", isActive: false),
+  LyricLine(text: "The blood moon is on the rise", isActive: false),
+  LyricLine(text: "The fire burning in my eyes", isActive: false),
+  LyricLine(text: "No, nobody but me can keep me safe", isActive: false),
+  LyricLine(text: "And I'm on my way", isActive: false),
+];
+
+class LyricLine {
+  final String text;
+  final bool isActive;
+  LyricLine({required this.text, required this.isActive});
+}

@@ -1,0 +1,68 @@
+name: brager
+description: "Free Music. No Ads. For Everyone."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '^3.12.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Navigation
+  go_router: ^13.0.0
+
+  # Audio
+  just_audio: ^0.9.40
+  audio_service: ^0.18.12
+
+  # Icons
+  cupertino_icons: ^1.0.6
+
+  # State management
+  provider: ^6.1.2
+
+  # Network images with caching
+  cached_network_image: ^3.3.1
+
+  # HTTP client
+  dio: ^5.4.3
+
+  # Local storage
+  shared_preferences: ^2.2.3
+
+  # SVG support
+  flutter_svg: ^2.0.10+1
+
+  # Smooth page transitions
+  page_transition: ^2.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/fonts/ibm-plex-sans/complete/ttf/
+    - assets/fonts/ibm-plex-mono/fonts/complete/ttf/
+
+  fonts:
+    - family: IBMPlexSans
+      fonts:
+        - asset: assets/fonts/ibm-plex-sans/complete/ttf/IBM Plex Sans Var-Roman.ttf
+
+    - family: IBMPlexMono
+      fonts:
+        - asset: assets/fonts/ibm-plex-mono/fonts/complete/ttf/IBMPlexMono-Regular.ttf
+        - asset: assets/fonts/ibm-plex-mono/fonts/complete/ttf/IBMPlexMono-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/ibm-plex-mono/fonts/complete/ttf/IBMPlexMono-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/ibm-plex-mono/fonts/complete/ttf/IBMPlexMono-Bold.ttf
+          weight: 700
