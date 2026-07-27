@@ -38,6 +38,12 @@ dependencies:
   # Smooth page transitions
   page_transition: ^2.1.0
 
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_linux: any
+  just_waveform: ^0.0.7
+  path_provider: ^2.1.4
+  path: ^1.9.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -49,6 +55,8 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/audio/
+    - assets/lyrics/
     - assets/fonts/ibm-plex-sans/complete/ttf/
     - assets/fonts/ibm-plex-mono/fonts/complete/ttf/
 

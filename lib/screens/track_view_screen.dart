@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../data/mock_data.dart';
-import '../widgets/thumbnail.dart';
+import '../services/audio_player_service.dart';
+import '../services/waveform_service.dart';
+import '../widgets/track_thumbnail.dart';
 import '../widgets/waveform_scrubber.dart';
 import 'lyrics_screen.dart';
 
@@ -15,26 +18,41 @@ class TrackViewScreen extends StatefulWidget {
 }
 
 class _TrackViewScreenState extends State<TrackViewScreen> {
-  bool _isPlaying = true;
-  bool _isShuffle = false;
-  bool _isRepeat = false;
-  double _progress = 0.42;
   late bool _liked;
+  double? _dragProgress;
+  List<double>? _waveformBars;
 
   @override
   void initState() {
     super.initState();
     _liked = widget.track.liked;
+    _loadWaveform();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AudioPlayerService>().play(widget.track);
+    });
+  }
+
+  Future<void> _loadWaveform() async {
+    // Only attempt for local asset URLs
+    final url = widget.track.audioUrl;
+    final assetPath = url.startsWith('asset:///assets/')
+        ? url.replaceFirst('asset:///', '')
+        : null;
+    final bars = await WaveformService.extract(assetPath);
+    if (mounted) setState(() => _waveformBars = bars);
   }
 
   @override
   Widget build(BuildContext context) {
+    final svc = context.watch<AudioPlayerService>();
+    final progress = _dragProgress ?? svc.progress;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
-            // ── Top bar ────────────────────────────────────────────────────
+            // ── Top bar ──────────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
               child: Row(
@@ -75,32 +93,22 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
 
             const SizedBox(height: 24),
 
-            // ── Album art ──────────────────────────────────────────────────
+            // ── Album art ────────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),
               child: AspectRatio(
                 aspectRatio: 1,
-                child: Thumbnail(
+                child: TrackThumbnail(
                   size: double.infinity,
+                  assetPath: widget.track.thumbnailPath,
                   borderRadius: 12,
-                  child: const Center(
-                    child: Text(
-                      'COVER',
-                      style: TextStyle(
-                        fontFamily: AppFonts.mono,
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ),
                 ),
               ),
             ),
 
             const SizedBox(height: 28),
 
-            // ── Track info + like ──────────────────────────────────────────
+            // ── Track info + like ────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
@@ -146,27 +154,46 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
 
             const SizedBox(height: 24),
 
-            // ── Progress bar ───────────────────────────────────────────────
+            // ── Waveform scrubber ────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: WaveformScrubber(
-                progress: _progress,
-                height: 48,
-                passiveColor: const Color(0xFF555555),
-                onChanged: (v) => setState(() => _progress = v),
-              ),
+              child: svc.isLoading
+                  ? const SizedBox(
+                      height: 48,
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: AppColors.accent,
+                            strokeWidth: 2,
+                          ),
+                        ),
+                      ),
+                    )
+                  : WaveformScrubber(
+                      progress: progress,
+                      height: 48,
+                      bars: _waveformBars,
+                      passiveColor: const Color(0xFF555555),
+                      onChanged: (v) => setState(() => _dragProgress = v),
+                      onChangeEnd: (v) {
+                        setState(() => _dragProgress = null);
+                        svc.seekToFraction(v);
+                      },
+                    ),
             ),
 
             const SizedBox(height: 6),
 
-            // ── Time stamps ────────────────────────────────────────────────
+            // ── Timestamps ───────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    '1:32',
+                    svc.positionLabel,
                     style: const TextStyle(
                       fontFamily: AppFonts.mono,
                       fontSize: 11,
@@ -174,7 +201,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                     ),
                   ),
                   Text(
-                    '3:38',
+                    svc.durationLabel,
                     style: const TextStyle(
                       fontFamily: AppFonts.mono,
                       fontSize: 11,
@@ -187,24 +214,24 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
 
             const SizedBox(height: 24),
 
-            // ── Transport controls ─────────────────────────────────────────
+            // ── Transport controls ───────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   GestureDetector(
-                    onTap: () => setState(() => _isShuffle = !_isShuffle),
+                    onTap: svc.toggleShuffle,
                     child: Icon(
                       Icons.shuffle,
-                      color: _isShuffle
+                      color: svc.isShuffle
                           ? AppColors.accent
                           : AppColors.textPrimary,
                       size: 24,
                     ),
                   ),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: () => svc.seekToFraction(0),
                     child: const Icon(
                       Icons.skip_previous,
                       color: AppColors.textPrimary,
@@ -212,7 +239,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => setState(() => _isPlaying = !_isPlaying),
+                    onTap: svc.togglePlayPause,
                     child: Container(
                       width: 60,
                       height: 60,
@@ -220,11 +247,19 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                         color: AppColors.textPrimary,
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        _isPlaying ? Icons.pause : Icons.play_arrow,
-                        color: AppColors.background,
-                        size: 32,
-                      ),
+                      child: svc.isLoading
+                          ? const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: CircularProgressIndicator(
+                                color: AppColors.background,
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          : Icon(
+                              svc.isPlaying ? Icons.pause : Icons.play_arrow,
+                              color: AppColors.background,
+                              size: 32,
+                            ),
                     ),
                   ),
                   GestureDetector(
@@ -236,10 +271,10 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => setState(() => _isRepeat = !_isRepeat),
+                    onTap: svc.toggleRepeat,
                     child: Icon(
                       Icons.repeat,
-                      color: _isRepeat
+                      color: svc.isRepeat
                           ? AppColors.accent
                           : AppColors.textPrimary,
                       size: 24,
@@ -251,7 +286,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
 
             const SizedBox(height: 28),
 
-            // ── Bluetooth device ───────────────────────────────────────────
+            // ── Bluetooth ────────────────────────────────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: const [
@@ -270,7 +305,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
 
             const SizedBox(height: 20),
 
-            // ── Bottom actions ─────────────────────────────────────────────
+            // ── Bottom actions ───────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
@@ -311,8 +346,6 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
     );
   }
 }
-
-// ── Action button ──────────────────────────────────────────────────────────────
 
 class _ActionButton extends StatelessWidget {
   final IconData icon;

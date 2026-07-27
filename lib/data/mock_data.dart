@@ -3,6 +3,11 @@ class MockTrack {
   final String title;
   final String artist;
   final String song;
+  final String audioUrl;
+  final String?
+  thumbnailPath; // local asset path e.g. 'assets/images/on_my_way.jpg'
+  final String?
+  lyricsPath; // local asset path e.g. 'assets/lyrics/on_my_way.lrc'
   bool liked;
 
   MockTrack({
@@ -10,6 +15,9 @@ class MockTrack {
     required this.title,
     required this.artist,
     required this.song,
+    required this.audioUrl,
+    this.thumbnailPath,
+    this.lyricsPath,
     this.liked = false,
   });
 }
@@ -38,6 +46,9 @@ final mockTracks = [
     title: 'Summertime Sadness',
     artist: 'Lana Del Rey',
     song: 'SONG',
+    audioUrl: 'asset:///assets/audio/summertime_sadness.mp3',
+    thumbnailPath: 'assets/images/summertime_sadness.jpg',
+    lyricsPath: 'assets/lyrics/summertime_sadness.lrc',
     liked: true,
   ),
   MockTrack(
@@ -45,6 +56,8 @@ final mockTracks = [
     title: 'Say Yes To Heaven',
     artist: 'Lana Del Rey',
     song: 'SONG',
+    audioUrl:
+        'https://cdns-preview-e.dzcdn.net/stream/c-e77d23e0c8c56974edce9d0a8c6b1fb0-3.mp3',
     liked: false,
   ),
   MockTrack(
@@ -52,6 +65,8 @@ final mockTracks = [
     title: 'Born To Die',
     artist: 'Lana Del Rey',
     song: 'SONG',
+    audioUrl:
+        'https://cdns-preview-d.dzcdn.net/stream/c-d975e8b60743e2ce5bbeaef5e78bb0dd-8.mp3',
     liked: false,
   ),
   MockTrack(
@@ -59,6 +74,9 @@ final mockTracks = [
     title: 'On My Way',
     artist: 'Alan Walker & Sabrina Carpenter',
     song: 'SONG',
+    audioUrl: 'asset:///assets/audio/on_my_way.mp3',
+    thumbnailPath: 'assets/images/on_my_way.jpg',
+    lyricsPath: 'assets/lyrics/on_my_way.lrc',
     liked: true,
   ),
   MockTrack(
@@ -66,6 +84,7 @@ final mockTracks = [
     title: 'Rotana FM',
     artist: '90.1 FM - EGYPT',
     song: 'RADIO',
+    audioUrl: 'https://n05.rcs.revma.com/ypqhjfkzktzuv',
     liked: false,
   ),
 ];

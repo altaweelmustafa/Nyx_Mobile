@@ -11,58 +11,66 @@ class WaveformScrubber extends StatelessWidget {
   final double barWidth;
   final double barGap;
   final double thumbRadius;
+  final List<double>? bars; // real amplitude data from WaveformService
   final ValueChanged<double>? onChanged;
+  final ValueChanged<double>? onChangeEnd;
 
   const WaveformScrubber({
     super.key,
     required this.progress,
     this.height = 40,
     this.activeColor = AppColors.accent,
-    this.passiveColor = const Color(0x2DFFFFFF), // white @ ~18%
+    this.passiveColor = const Color(0x2DFFFFFF),
     this.thumbColor = AppColors.textPrimary,
     this.barWidth = 3.0,
     this.barGap = 2.0,
     this.thumbRadius = 6.0,
+    this.bars,
     this.onChanged,
+    this.onChangeEnd,
   });
 
-  void _handleDrag(BuildContext context, Offset globalPos) {
-    if (onChanged == null) return;
+  double _fraction(BuildContext context, Offset globalPos) {
     final box = context.findRenderObject() as RenderBox;
     final localX = box.globalToLocal(globalPos).dx;
-    final v = (localX / box.size.width).clamp(0.0, 1.0);
-    onChanged!(v);
+    return (localX / box.size.width).clamp(0.0, 1.0);
   }
 
   @override
   Widget build(BuildContext context) {
     final painter = _WaveformPainter(
-      progress:    progress,
+      progress: progress,
       activeColor: activeColor,
       passiveColor: passiveColor,
-      thumbColor:  thumbColor,
-      barWidth:    barWidth,
-      barGap:      barGap,
+      thumbColor: thumbColor,
+      barWidth: barWidth,
+      barGap: barGap,
       thumbRadius: thumbRadius,
+      bars: bars,
     );
 
-    if (onChanged == null) {
-      return SizedBox(
-        height: height,
-        width: double.infinity,
-        child: CustomPaint(painter: painter),
-      );
-    }
+    final child = SizedBox(
+      height: height,
+      width: double.infinity,
+      child: CustomPaint(painter: painter),
+    );
+
+    if (onChanged == null && onChangeEnd == null) return child;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onHorizontalDragUpdate: (d) => _handleDrag(context, d.globalPosition),
-      onTapDown: (d) => _handleDrag(context, d.globalPosition),
-      child: SizedBox(
-        height: height,
-        width: double.infinity,
-        child: CustomPaint(painter: painter),
-      ),
+      onTapDown: (d) {
+        final v = _fraction(context, d.globalPosition);
+        onChanged?.call(v);
+        onChangeEnd?.call(v);
+      },
+      onHorizontalDragUpdate: (d) {
+        onChanged?.call(_fraction(context, d.globalPosition));
+      },
+      onHorizontalDragEnd: (_) {
+        onChangeEnd?.call(progress);
+      },
+      child: child,
     );
   }
 }
@@ -71,12 +79,13 @@ class WaveformScrubber extends StatelessWidget {
 
 class _WaveformPainter extends CustomPainter {
   final double progress;
-  final Color  activeColor;
-  final Color  passiveColor;
-  final Color  thumbColor;
+  final Color activeColor;
+  final Color passiveColor;
+  final Color thumbColor;
   final double barWidth;
   final double barGap;
   final double thumbRadius;
+  final List<double>? bars;
 
   const _WaveformPainter({
     required this.progress,
@@ -86,24 +95,23 @@ class _WaveformPainter extends CustomPainter {
     required this.barWidth,
     required this.barGap,
     required this.thumbRadius,
+    this.bars,
   });
 
-  /// Deterministic waveform height for bar [i] out of [total].
-  /// Uses overlapping sines to produce an organic mountain silhouette.
-  double _barHeight(int i, int total) {
-    final t  = i / total;
+  // Fallback: sine-based shape when no real data is available
+  double _sineHeight(int i, int total) {
+    final t = i / total;
     final w1 = 0.5 + 0.5 * math.sin(t * 18.0);
     final w2 = 0.5 + 0.5 * math.sin(t * 37.0 + 1.2);
-    final w3 = 0.5 + 0.5 * math.sin(t *  7.0 + 0.6);
-    final h  = w1 * 0.50 + w2 * 0.30 + w3 * 0.20;
-    // Taper edges so the waveform fades in/out cleanly
+    final w3 = 0.5 + 0.5 * math.sin(t * 7.0 + 0.6);
+    final h = w1 * 0.50 + w2 * 0.30 + w3 * 0.20;
     final edge = math.min(t * 8, (1 - t) * 8).clamp(0.0, 1.0);
     return (h * edge).clamp(0.06, 1.0);
   }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final total  = (size.width / (barWidth + barGap)).floor();
+    final total = (size.width / (barWidth + barGap)).floor();
     final cutoff = (total * progress).round();
 
     final activePaint = Paint()
@@ -115,9 +123,22 @@ class _WaveformPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     for (int i = 0; i < total; i++) {
-      final x    = i * (barWidth + barGap);
-      final barH = (_barHeight(i, total) * size.height).clamp(2.0, size.height);
-      final top  = (size.height - barH) / 2;
+      final x = i * (barWidth + barGap);
+
+      double normalised;
+      if (bars != null && bars!.isNotEmpty) {
+        // Map bar index to amplitude data index
+        final srcIdx = ((i / total) * bars!.length).floor().clamp(
+          0,
+          bars!.length - 1,
+        );
+        normalised = bars![srcIdx];
+      } else {
+        normalised = _sineHeight(i, total);
+      }
+
+      final barH = (normalised * size.height).clamp(2.0, size.height);
+      final top = (size.height - barH) / 2;
 
       canvas.drawRRect(
         RRect.fromRectAndRadius(
@@ -128,9 +149,11 @@ class _WaveformPainter extends CustomPainter {
       );
     }
 
-    // Scrubber thumb circle
-    final thumbX = (cutoff * (barWidth + barGap))
-        .clamp(thumbRadius, size.width - thumbRadius);
+    // Scrubber thumb
+    final thumbX = (cutoff * (barWidth + barGap)).clamp(
+      thumbRadius,
+      size.width - thumbRadius,
+    );
     canvas.drawCircle(
       Offset(thumbX, size.height / 2),
       thumbRadius,
@@ -140,7 +163,7 @@ class _WaveformPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_WaveformPainter old) =>
-      old.progress    != progress    ||
+      old.progress != progress ||
       old.activeColor != activeColor ||
-      old.barWidth    != barWidth;
+      old.bars != bars;
 }
