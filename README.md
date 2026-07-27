@@ -1,4 +1,4 @@
-# brager
+# Nyx
 
 A new Flutter project.
 
