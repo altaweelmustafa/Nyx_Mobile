@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../services/audio_player_service.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/home_mini_player.dart';
 import 'home_screen.dart';
@@ -7,7 +9,6 @@ import 'library_screen.dart';
 import 'search_screen.dart';
 import 'profile_screen.dart';
 import 'track_view_screen.dart';
-import '../data/mock_data.dart';
 
 class ShellScreen extends StatefulWidget {
   const ShellScreen({super.key});
@@ -22,8 +23,10 @@ class _ShellScreenState extends State<ShellScreen> {
   final _screens = const [HomeScreen(), LibraryScreen(), SearchScreen()];
 
   void _openPlayer() {
+    final track = context.read<AudioPlayerService>().currentTrack;
+    if (track == null) return;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TrackViewScreen(track: mockTracks[3])),
+      MaterialPageRoute(builder: (_) => TrackViewScreen(track: track)),
     );
   }
 

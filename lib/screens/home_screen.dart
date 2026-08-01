@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../data/mock_data.dart';
 import '../widgets/thumbnail.dart';
-import 'track_view_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});

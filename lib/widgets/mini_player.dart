@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/audio_player_service.dart';
+import 'loop_mode_button.dart';
 import 'track_thumbnail.dart';
 import 'waveform_scrubber.dart';
 
@@ -68,9 +69,19 @@ class MiniPlayer extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(Icons.shuffle, color: AppColors.textPrimary, size: 20),
+                GestureDetector(
+                  onTap: svc.toggleShuffle,
+                  child: Icon(
+                    Icons.shuffle,
+                    color: svc.isShuffle ? AppColors.accent : AppColors.textPrimary,
+                    size: 20,
+                  ),
+                ),
                 const SizedBox(width: 8),
-                Icon(Icons.skip_previous, color: AppColors.textPrimary, size: 22),
+                GestureDetector(
+                  onTap: svc.playPrevious,
+                  child: const Icon(Icons.skip_previous, color: AppColors.textPrimary, size: 22),
+                ),
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: svc.togglePlayPause,
@@ -90,9 +101,12 @@ class MiniPlayer extends StatelessWidget {
                         ),
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.skip_next, color: AppColors.textPrimary, size: 22),
+                GestureDetector(
+                  onTap: svc.playNext,
+                  child: const Icon(Icons.skip_next, color: AppColors.textPrimary, size: 22),
+                ),
                 const SizedBox(width: 8),
-                Icon(Icons.repeat, color: AppColors.textPrimary, size: 20),
+                LoopModeButton(loopMode: svc.loopMode, onTap: svc.toggleRepeat, size: 20),
               ],
             ),
             const SizedBox(height: 8),

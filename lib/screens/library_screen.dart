@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../data/mock_data.dart';
-import '../widgets/thumbnail.dart';
+import '../widgets/track_thumbnail.dart';
 import 'playlist_screen.dart';
 import 'track_view_screen.dart';
 
@@ -69,7 +69,11 @@ class LibraryScreen extends StatelessWidget {
                       ),
                     ),
                     child: _LibraryRow(
-                      leading: Thumbnail(size: 52, borderRadius: 6),
+                      leading: TrackThumbnail(
+                        size: 52,
+                        borderRadius: 6,
+                        assetPath: playlist.tracks.isNotEmpty ? playlist.tracks.first.thumbnailPath : null,
+                      ),
                       title: playlist.name,
                       subtitle: '${playlist.trackCount} TRACKS',
                       trailing: Icon(

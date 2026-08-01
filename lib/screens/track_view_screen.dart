@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../data/mock_data.dart';
 import '../services/audio_player_service.dart';
+import '../widgets/loop_mode_button.dart';
 import '../services/waveform_service.dart';
 import '../widgets/track_thumbnail.dart';
 import '../widgets/waveform_scrubber.dart';
@@ -21,20 +22,46 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
   late bool _liked;
   double? _dragProgress;
   List<double>? _waveformBars;
+  String? _loadedTrackId;
+  AudioPlayerService? _svc;
 
   @override
   void initState() {
     super.initState();
     _liked = widget.track.liked;
-    _loadWaveform();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AudioPlayerService>().play(widget.track);
     });
   }
 
-  Future<void> _loadWaveform() async {
-    // Only attempt for local asset URLs
-    final url = widget.track.audioUrl;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _svc?.removeListener(_onTrackChanged);
+    _svc = context.read<AudioPlayerService>();
+    _svc!.addListener(_onTrackChanged);
+    _maybeReloadWaveform(_svc!.currentTrack ?? widget.track);
+  }
+
+  void _onTrackChanged() {
+    final track = _svc?.currentTrack;
+    if (track != null && track.id != _loadedTrackId) {
+      setState(() {
+        _liked = track.liked;
+        _waveformBars = null;
+      });
+      _maybeReloadWaveform(track);
+    }
+  }
+
+  void _maybeReloadWaveform(MockTrack track) {
+    if (track.id == _loadedTrackId) return;
+    _loadedTrackId = track.id;
+    _loadWaveform(track);
+  }
+
+  Future<void> _loadWaveform(MockTrack track) async {
+    final url = track.audioUrl;
     final assetPath = url.startsWith('asset:///assets/')
         ? url.replaceFirst('asset:///', '')
         : null;
@@ -43,8 +70,15 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
   }
 
   @override
+  void dispose() {
+    _svc?.removeListener(_onTrackChanged);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final svc = context.watch<AudioPlayerService>();
+    final track = svc.currentTrack ?? widget.track;
     final progress = _dragProgress ?? svc.progress;
 
     return Scaffold(
@@ -67,7 +101,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                   ),
                   Expanded(
                     child: Text(
-                      widget.track.title,
+                      track.title,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontFamily: AppFonts.sans,
@@ -100,7 +134,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                 aspectRatio: 1,
                 child: TrackThumbnail(
                   size: double.infinity,
-                  assetPath: widget.track.thumbnailPath,
+                  assetPath: track.thumbnailPath,
                   borderRadius: 12,
                 ),
               ),
@@ -118,7 +152,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.track.title,
+                          track.title,
                           style: const TextStyle(
                             fontFamily: AppFonts.sans,
                             fontSize: 20,
@@ -128,7 +162,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          widget.track.artist,
+                          track.artist,
                           style: const TextStyle(
                             fontFamily: AppFonts.sans,
                             fontSize: 14,
@@ -231,7 +265,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => svc.seekToFraction(0),
+                    onTap: svc.playPrevious,
                     child: const Icon(
                       Icons.skip_previous,
                       color: AppColors.textPrimary,
@@ -263,23 +297,14 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: svc.playNext,
                     child: const Icon(
                       Icons.skip_next,
                       color: AppColors.textPrimary,
                       size: 36,
                     ),
                   ),
-                  GestureDetector(
-                    onTap: svc.toggleRepeat,
-                    child: Icon(
-                      Icons.repeat,
-                      color: svc.isRepeat
-                          ? AppColors.accent
-                          : AppColors.textPrimary,
-                      size: 24,
-                    ),
-                  ),
+                  LoopModeButton(loopMode: svc.loopMode, onTap: svc.toggleRepeat, size: 24),
                 ],
               ),
             ),

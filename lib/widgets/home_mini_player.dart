@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/audio_player_service.dart';
+import 'loop_mode_button.dart';
 import 'waveform_scrubber.dart';
 
 class HomeMiniPlayer extends StatelessWidget {
@@ -131,7 +132,7 @@ class HomeMiniPlayer extends StatelessWidget {
                           icon: Icons.skip_previous,
                           size: 26,
                           color: Colors.white,
-                          onTap: () => svc.seekToFraction(0),
+                          onTap: svc.playPrevious,
                         ),
                         _Btn(
                           icon: svc.isPlaying ? Icons.pause : Icons.play_arrow,
@@ -143,14 +144,9 @@ class HomeMiniPlayer extends StatelessWidget {
                           icon: Icons.skip_next,
                           size: 26,
                           color: Colors.white,
-                          onTap: () {},
+                          onTap: svc.playNext,
                         ),
-                        _Btn(
-                          icon: Icons.repeat,
-                          size: 20,
-                          color: svc.isRepeat ? AppColors.accent : Colors.white,
-                          onTap: svc.toggleRepeat,
-                        ),
+                        LoopModeButton(loopMode: svc.loopMode, onTap: svc.toggleRepeat, size: 20, inactiveColor: Colors.white),
                       ],
                     ),
 

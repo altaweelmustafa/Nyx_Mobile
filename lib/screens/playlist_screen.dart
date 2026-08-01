@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../data/mock_data.dart';
-import '../widgets/thumbnail.dart';
+import '../services/audio_player_service.dart';
+import '../widgets/track_thumbnail.dart';
 import 'track_view_screen.dart';
 
 class PlaylistScreen extends StatefulWidget {
@@ -67,17 +69,20 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 itemBuilder: (context, i) {
                   final track = _tracks[i];
                   return GestureDetector(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => TrackViewScreen(track: track),
-                      ),
-                    ),
+                    onTap: () {
+                      context.read<AudioPlayerService>().playQueue(_tracks, i);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => TrackViewScreen(track: track),
+                        ),
+                      );
+                    },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       child: Row(
                         children: [
                           // Thumbnail
-                          Thumbnail(size: 46, borderRadius: 6),
+                          TrackThumbnail(size: 46, assetPath: track.thumbnailPath, borderRadius: 6),
                           const SizedBox(width: 14),
                           // Info
                           Expanded(
