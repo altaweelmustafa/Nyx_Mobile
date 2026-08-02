@@ -87,6 +87,16 @@ final mockTracks = [
     audioUrl: 'https://n05.rcs.revma.com/ypqhjfkzktzuv',
     liked: false,
   ),
+  MockTrack(
+    id: '6',
+    title: 'Faded',
+    artist: 'Alan Walker',
+    song: 'SONG',
+    audioUrl: 'asset:///assets/audio/faded.mp3',
+    thumbnailPath: 'assets/images/faded.jpg',
+    lyricsPath: 'assets/lyrics/faded.lrc',
+    liked: false,
+  ),
 ];
 
 // ── Playlists ─────────────────────────────────────────────────────────────────
@@ -111,7 +121,7 @@ final mockPlaylists = [
     name: 'Study',
     trackCount: 9,
     likes: 5,
-    tracks: [mockTracks[0], mockTracks[3]],
+    tracks: [mockTracks[0], mockTracks[3], mockTracks[5]],
   ),
 ];
 
