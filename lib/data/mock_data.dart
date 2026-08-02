@@ -97,6 +97,26 @@ final mockTracks = [
     lyricsPath: 'assets/lyrics/faded.lrc',
     liked: false,
   ),
+  MockTrack(
+    id: '7',
+    title: 'Genesis',
+    artist: 'Grimes',
+    song: 'SONG',
+    audioUrl: 'asset:///assets/audio/grimes_genesis.m4a',
+    thumbnailPath: 'assets/images/grimes_genesis.jpg',
+    lyricsPath: 'assets/lyrics/grimes_genesis.lrc',
+    liked: false,
+  ),
+  MockTrack(
+    id: '8',
+    title: 'Delicate Weapon',
+    artist: 'Grimes & Lizzy Wizzy',
+    song: 'SONG',
+    audioUrl: 'asset:///assets/audio/grimes_lizzy_wizzy_delicate_weapon.m4a',
+    thumbnailPath: 'assets/images/grimes_lizzy_wizzy_delicate_weapon.jpg',
+    lyricsPath: 'assets/lyrics/grimes_lizzy_wizzy_delicate_weapon.lrc',
+    liked: false,
+  ),
 ];
 
 // ── Playlists ─────────────────────────────────────────────────────────────────
@@ -121,7 +141,7 @@ final mockPlaylists = [
     name: 'Study',
     trackCount: 9,
     likes: 5,
-    tracks: [mockTracks[0], mockTracks[3], mockTracks[5]],
+    tracks: [mockTracks[0], mockTracks[3], mockTracks[5], mockTracks[6], mockTracks[7]],
   ),
 ];
 

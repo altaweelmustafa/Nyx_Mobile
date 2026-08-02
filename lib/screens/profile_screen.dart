@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../data/mock_data.dart';
 import '../widgets/thumbnail.dart';
 import 'playlist_screen.dart';
+import 'import_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -29,6 +30,17 @@ class ProfileScreen extends StatelessWidget {
                     ),
                   ),
                   const Spacer(),
+                  IconButton(
+                    tooltip: 'Import Track (dev)',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ImportScreen()),
+                    ),
+                    icon: const Icon(
+                      Icons.library_music_outlined,
+                      color: AppColors.textPrimary,
+                      size: 22,
+                    ),
+                  ),
                   IconButton(
                     onPressed: () {},
                     icon: const Icon(
