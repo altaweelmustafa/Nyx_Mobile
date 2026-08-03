@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_scaffold.dart';
 
 /// Dev-only tool: search a song, review the auto-fetched metadata/lyrics,
 /// and import it into this app's catalog via the local nyx-orc pipeline
@@ -176,8 +177,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
+    return AppScaffold(
       appBar: AppBar(title: const Text('Import Track')),
       body: SafeArea(
         child: ListView(

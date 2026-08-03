@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/audio_player_service.dart';
+import 'bluetooth_indicator.dart';
 import 'loop_mode_button.dart';
 import 'track_thumbnail.dart';
 import 'waveform_scrubber.dart';
@@ -43,7 +44,8 @@ class MiniPlayer extends StatelessWidget {
                       Text(
                         track.title,
                         style: const TextStyle(
-                          fontFamily: AppFonts.mono,
+                          fontFamily: AppFonts.sans,
+                          fontFamilyFallback: AppFonts.fallback,
                           fontSize: 13,
                           fontWeight: FontWeight.w500,
                           color: AppColors.textPrimary,
@@ -52,20 +54,7 @@ class MiniPlayer extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
-                      Row(
-                        children: const [
-                          Icon(Icons.bluetooth, size: 11, color: AppColors.accent),
-                          SizedBox(width: 4),
-                          Text(
-                            "Bluetooth's Device name",
-                            style: TextStyle(
-                              fontFamily: AppFonts.sans,
-                              fontSize: 11,
-                              color: AppColors.accent,
-                            ),
-                          ),
-                        ],
-                      ),
+                      const BluetoothIndicator(iconSize: 11, fontSize: 11, nameWidth: 100),
                     ],
                   ),
                 ),

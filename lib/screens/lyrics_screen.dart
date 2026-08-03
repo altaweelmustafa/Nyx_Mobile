@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../data/mock_data.dart';
 import '../services/lyrics_service.dart';
 import '../services/audio_player_service.dart';
+import '../widgets/app_scaffold.dart';
 import '../widgets/track_thumbnail.dart';
 
 class LyricsScreen extends StatefulWidget {
@@ -70,8 +71,7 @@ class _LyricsScreenState extends State<LyricsScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
+    return AppScaffold(
       body: SafeArea(
         child: Column(
           children: [

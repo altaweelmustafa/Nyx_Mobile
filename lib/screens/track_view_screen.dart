@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../data/mock_data.dart';
 import '../services/audio_player_service.dart';
+import '../widgets/bluetooth_indicator.dart';
 import '../widgets/loop_mode_button.dart';
 import '../services/waveform_service.dart';
 import '../widgets/track_thumbnail.dart';
@@ -312,20 +313,16 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
             const SizedBox(height: 28),
 
             // ── Bluetooth ────────────────────────────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.bluetooth, size: 14, color: AppColors.accent),
-                SizedBox(width: 6),
-                Text(
-                  "Bluetooth's Device Name",
-                  style: TextStyle(
-                    fontFamily: AppFonts.sans,
-                    fontSize: 12,
-                    color: AppColors.accent,
-                  ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 28),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: BluetoothIndicator(
+                  iconSize: 14,
+                  fontSize: 12,
+                  nameWidth: 200,
                 ),
-              ],
+              ),
             ),
 
             const SizedBox(height: 20),

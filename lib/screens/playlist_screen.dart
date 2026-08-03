@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../data/mock_data.dart';
 import '../services/audio_player_service.dart';
+import '../widgets/app_scaffold.dart';
 import '../widgets/track_thumbnail.dart';
 import 'track_view_screen.dart';
 
@@ -26,8 +27,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
+    return AppScaffold(
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -69,6 +69,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                 itemBuilder: (context, i) {
                   final track = _tracks[i];
                   return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: () {
                       context.read<AudioPlayerService>().playQueue(_tracks, i);
                       Navigator.of(context).push(

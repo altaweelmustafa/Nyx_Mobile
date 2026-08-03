@@ -5,6 +5,7 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'theme/app_theme.dart';
 import 'screens/start_screen.dart';
 import 'services/audio_player_service.dart';
+import 'services/bluetooth_route_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,8 +32,11 @@ void main() {
   ]);
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => AudioPlayerService(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AudioPlayerService()),
+        ChangeNotifierProvider(create: (_) => BluetoothRouteService()),
+      ],
       child: const BragerApp(),
     ),
   );

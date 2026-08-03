@@ -52,24 +52,6 @@ final mockTracks = [
     liked: true,
   ),
   MockTrack(
-    id: '2',
-    title: 'Say Yes To Heaven',
-    artist: 'Lana Del Rey',
-    song: 'SONG',
-    audioUrl:
-        'https://cdns-preview-e.dzcdn.net/stream/c-e77d23e0c8c56974edce9d0a8c6b1fb0-3.mp3',
-    liked: false,
-  ),
-  MockTrack(
-    id: '3',
-    title: 'Born To Die',
-    artist: 'Lana Del Rey',
-    song: 'SONG',
-    audioUrl:
-        'https://cdns-preview-d.dzcdn.net/stream/c-d975e8b60743e2ce5bbeaef5e78bb0dd-8.mp3',
-    liked: false,
-  ),
-  MockTrack(
     id: '4',
     title: 'On My Way',
     artist: 'Alan Walker & Sabrina Carpenter',
@@ -81,10 +63,10 @@ final mockTracks = [
   ),
   MockTrack(
     id: '5',
-    title: 'Rotana FM',
-    artist: '90.1 FM - EGYPT',
+    title: 'NRJ Egypt',
+    artist: 'Egypt',
     song: 'RADIO',
-    audioUrl: 'https://n05.rcs.revma.com/ypqhjfkzktzuv',
+    audioUrl: 'https://nrjstreaming.ahmed-melege.com/nrjegypt',
     liked: false,
   ),
   MockTrack(
@@ -117,9 +99,23 @@ final mockTracks = [
     lyricsPath: 'assets/lyrics/grimes_lizzy_wizzy_delicate_weapon.lrc',
     liked: false,
   ),
+  MockTrack(
+    id: '9',
+    title: 'Espresso',
+    artist: 'Sabrina Carpenter',
+    song: 'SONG',
+    audioUrl: 'asset:///assets/audio/sabrina_carpenter_espresso.m4a',
+    thumbnailPath: 'assets/images/sabrina_carpenter_espresso.jpg',
+    lyricsPath: 'assets/lyrics/sabrina_carpenter_espresso.lrc',
+    liked: false,
+  ),
 ];
 
 // ── Playlists ─────────────────────────────────────────────────────────────────
+
+// Look up by id rather than list position -- positions shift whenever a
+// track is added/removed above, which is what caused the last RangeError.
+MockTrack _track(String id) => mockTracks.firstWhere((t) => t.id == id);
 
 final mockPlaylists = [
   MockPlaylist(
@@ -127,21 +123,21 @@ final mockPlaylists = [
     name: 'Playlist #1',
     trackCount: 13,
     likes: 7,
-    tracks: [mockTracks[0], mockTracks[1], mockTracks[2]],
+    tracks: [_track('1'), _track('4'), _track('6')],
   ),
   MockPlaylist(
     id: 'p2',
     name: 'Playlist #2',
     trackCount: 5,
     likes: 4,
-    tracks: [mockTracks[3]],
+    tracks: [_track('4')],
   ),
   MockPlaylist(
     id: 'p3',
     name: 'Study',
     trackCount: 9,
     likes: 5,
-    tracks: [mockTracks[0], mockTracks[3], mockTracks[5], mockTracks[6], mockTracks[7]],
+    tracks: [_track('1'), _track('4'), _track('6'), _track('7'), _track('8'), _track('9')],
   ),
 ];
 
@@ -154,31 +150,6 @@ final mockSearchHistory = [
   'لما قلبي يدق بغار عليك',
 ];
 
-// ── For You cards ─────────────────────────────────────────────────────────────
-
-final mockForYouCards = ['history', 'most played', '2022 hit'];
-
-// ── Suggestion genres ─────────────────────────────────────────────────────────
-
-final mockSuggestions = ['SM5A FM', 'Jazz', 'Spanish'];
-
-// ── Lyrics ────────────────────────────────────────────────────────────────────
-
-final mockLyrics = [
-  LyricLine(text: "So then, when I'm finished", isActive: false),
-  LyricLine(text: "I'm all 'bout my business and", isActive: false),
-  LyricLine(text: "ready to save the world", isActive: false),
-  LyricLine(text: "I'm taking my misery, make it my bitch", isActive: false),
-  LyricLine(text: "Can't be everyone's favorite girl", isActive: false),
-  LyricLine(text: "So take aim and fire away", isActive: true),
-  LyricLine(text: "I've never been so wide awake", isActive: false),
-  LyricLine(text: "No, nobody but me can keep me safe", isActive: false),
-  LyricLine(text: "And I'm on my way", isActive: false),
-  LyricLine(text: "The blood moon is on the rise", isActive: false),
-  LyricLine(text: "The fire burning in my eyes", isActive: false),
-  LyricLine(text: "No, nobody but me can keep me safe", isActive: false),
-  LyricLine(text: "And I'm on my way", isActive: false),
-];
 
 class LyricLine {
   final String text;

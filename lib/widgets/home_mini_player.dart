@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/audio_player_service.dart';
+import 'bluetooth_indicator.dart';
 import 'loop_mode_button.dart';
 import 'waveform_scrubber.dart';
 
@@ -21,7 +22,7 @@ class HomeMiniPlayer extends StatelessWidget {
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-        height: 200,
+        height: 280,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: AppColors.surfaceHigh, // fallback if no art
@@ -83,14 +84,15 @@ class HomeMiniPlayer extends StatelessWidget {
                       ),
                     ),
 
-                    const Spacer(),
+                    const Spacer(flex: 2),
 
                     // Title
                     Text(
                       track.title,
                       style: const TextStyle(
-                        fontFamily: AppFonts.mono,
-                        fontSize: 14,
+                        fontFamily: AppFonts.sans,
+                        fontFamilyFallback: AppFonts.fallback,
+                        fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
@@ -98,23 +100,25 @@ class HomeMiniPlayer extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
 
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
+
+                    // Artist
+                    Text(
+                      track.artist,
+                      style: TextStyle(
+                        fontFamily: AppFonts.mono,
+                        fontFamilyFallback: AppFonts.fallback,
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.7),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+
+                    const Spacer(flex: 1),
 
                     // Bluetooth row
-                    Row(
-                      children: const [
-                        Icon(Icons.bluetooth, size: 12, color: AppColors.accent),
-                        SizedBox(width: 4),
-                        Text(
-                          "Bluetooth's Device name",
-                          style: TextStyle(
-                            fontFamily: AppFonts.sans,
-                            fontSize: 11,
-                            color: AppColors.accent,
-                          ),
-                        ),
-                      ],
-                    ),
+                    const BluetoothIndicator(iconSize: 12, fontSize: 11, nameWidth: 220),
 
                     const SizedBox(height: 14),
 

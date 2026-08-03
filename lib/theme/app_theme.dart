@@ -15,6 +15,12 @@ class AppColors {
 class AppFonts {
   static const sans = 'IBMPlexSans';
   static const mono = 'IBMPlexMono';
+  static const arabic = 'Almarai';
+
+  /// Glyphs the Latin faces above don't cover (Arabic script, etc.) fall
+  /// back to this automatically -- attach it to any TextStyle that doesn't
+  /// already inherit it from the theme's DefaultTextStyle.
+  static const fallback = [arabic];
 }
 
 class AppTheme {
@@ -30,6 +36,7 @@ class AppTheme {
         outline: AppColors.divider,
       ),
       fontFamily: AppFonts.sans,
+      fontFamilyFallback: AppFonts.fallback,
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
@@ -41,6 +48,7 @@ class AppTheme {
         ),
         titleTextStyle: TextStyle(
           fontFamily: AppFonts.sans,
+          fontFamilyFallback: AppFonts.fallback,
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
@@ -50,6 +58,7 @@ class AppTheme {
         // "For You", "Your Library", page headings
         headlineLarge: TextStyle(
           fontFamily: AppFonts.sans,
+          fontFamilyFallback: AppFonts.fallback,
           fontSize: 26,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
@@ -58,6 +67,7 @@ class AppTheme {
         // "Suggestions", section titles
         headlineMedium: TextStyle(
           fontFamily: AppFonts.sans,
+          fontFamilyFallback: AppFonts.fallback,
           fontSize: 22,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
@@ -66,12 +76,14 @@ class AppTheme {
         // Track names, playlist names
         titleLarge: TextStyle(
           fontFamily: AppFonts.sans,
+          fontFamilyFallback: AppFonts.fallback,
           fontSize: 17,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimary,
         ),
         titleMedium: TextStyle(
           fontFamily: AppFonts.sans,
+          fontFamilyFallback: AppFonts.fallback,
           fontSize: 15,
           fontWeight: FontWeight.w500,
           color: AppColors.textPrimary,
@@ -79,18 +91,21 @@ class AppTheme {
         // Artist names, subtitles
         bodyLarge: TextStyle(
           fontFamily: AppFonts.sans,
+          fontFamilyFallback: AppFonts.fallback,
           fontSize: 14,
           fontWeight: FontWeight.w400,
           color: AppColors.textSecondary,
         ),
         bodyMedium: TextStyle(
           fontFamily: AppFonts.sans,
+          fontFamilyFallback: AppFonts.fallback,
           fontSize: 13,
           fontWeight: FontWeight.w400,
           color: AppColors.textSecondary,
         ),
         bodySmall: TextStyle(
           fontFamily: AppFonts.sans,
+          fontFamilyFallback: AppFonts.fallback,
           fontSize: 12,
           fontWeight: FontWeight.w400,
           color: AppColors.textSecondary,
@@ -98,6 +113,7 @@ class AppTheme {
         // Track counts — uses Mono
         labelSmall: TextStyle(
           fontFamily: AppFonts.mono,
+          fontFamilyFallback: AppFonts.fallback,
           fontSize: 10,
           fontWeight: FontWeight.w500,
           color: AppColors.textSecondary,
@@ -111,6 +127,7 @@ class AppTheme {
         floatingLabelAlignment: FloatingLabelAlignment.start,
         labelStyle: const TextStyle(
           fontFamily: AppFonts.mono,
+          fontFamilyFallback: AppFonts.fallback,
           fontSize: 11,
           letterSpacing: 1.4,
           color: AppColors.textSecondary,
@@ -118,6 +135,7 @@ class AppTheme {
         // typed text style
         hintStyle: const TextStyle(
           fontFamily: AppFonts.sans,
+          fontFamilyFallback: AppFonts.fallback,
           color: AppColors.textSecondary,
           fontSize: 14,
         ),
@@ -147,6 +165,7 @@ class AppTheme {
           ),
           textStyle: const TextStyle(
             fontFamily: AppFonts.sans,
+            fontFamilyFallback: AppFonts.fallback,
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
@@ -162,6 +181,7 @@ class AppTheme {
           ),
           textStyle: const TextStyle(
             fontFamily: AppFonts.sans,
+            fontFamilyFallback: AppFonts.fallback,
             fontSize: 15,
             fontWeight: FontWeight.w500,
           ),

@@ -25,6 +25,7 @@ class LibraryScreen extends StatelessWidget {
 
             // ── Liked Tracks ─────────────────────────────────────────────────
             GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => TrackViewScreen(track: mockTracks[0]),
@@ -63,6 +64,7 @@ class LibraryScreen extends StatelessWidget {
               (playlist) => Column(
                 children: [
                   GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => PlaylistScreen(playlist: playlist),

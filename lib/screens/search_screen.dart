@@ -273,6 +273,7 @@ class _ResultsList extends StatelessWidget {
       itemBuilder: (context, i) {
         final track = results[i];
         return GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => onTap(track),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),

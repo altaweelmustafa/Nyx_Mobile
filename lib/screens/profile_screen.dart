@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../data/mock_data.dart';
+import '../widgets/app_scaffold.dart';
 import '../widgets/thumbnail.dart';
 import 'playlist_screen.dart';
 import 'import_screen.dart';
@@ -10,8 +11,7 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
+    return AppScaffold(
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.only(bottom: 40),
@@ -112,6 +112,7 @@ class ProfileScreen extends StatelessWidget {
             // ── Playlist rows ─────────────────────────────────────────────────
             ...mockPlaylists.map(
               (playlist) => GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => PlaylistScreen(playlist: playlist),
