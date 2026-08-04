@@ -210,7 +210,6 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                       progress: progress,
                       height: 48,
                       bars: _waveformBars,
-                      passiveColor: const Color(0xFF555555),
                       onChanged: (v) => setState(() => _dragProgress = v),
                       onChangeEnd: (v) {
                         setState(() => _dragProgress = null);

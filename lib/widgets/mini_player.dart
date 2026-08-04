@@ -102,7 +102,7 @@ class MiniPlayer extends StatelessWidget {
             WaveformScrubber(
               progress: svc.progress,
               height: 28,
-              thumbRadius: 4,
+              thumbRadius: 7,
             ),
           ],
         ),

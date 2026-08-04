@@ -163,7 +163,7 @@ class HomeMiniPlayer extends StatelessWidget {
                       activeColor: Colors.white,
                       passiveColor: Colors.white.withOpacity(0.22),
                       thumbColor: Colors.white,
-                      thumbRadius: 5,
+                      thumbRadius: 8,
                       onChanged: (v) => svc.seekToFraction(v),
                     ),
                   ],
