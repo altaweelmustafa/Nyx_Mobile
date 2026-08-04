@@ -1,4 +1,4 @@
-package com.example.brager
+package com.dash.nyx
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter

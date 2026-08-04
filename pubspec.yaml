@@ -50,6 +50,9 @@ dependencies:
   share_plus: ^13.3.0
   image_picker: ^1.2.3
 
+  # Auth
+  google_sign_in: ^6.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

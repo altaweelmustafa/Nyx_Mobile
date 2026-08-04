@@ -56,6 +56,12 @@ class AppDatabase {
       await db.execute('ALTER TABLE profile ADD COLUMN server_url TEXT');
       await db.update('profile', {'server_url': kDefaultServerUrl}, where: 'id = 1');
     }
+    if (!profileColumns.any((c) => c['name'] == 'google_id')) {
+      await db.execute('ALTER TABLE profile ADD COLUMN google_id TEXT');
+    }
+    if (!profileColumns.any((c) => c['name'] == 'google_email')) {
+      await db.execute('ALTER TABLE profile ADD COLUMN google_email TEXT');
+    }
 
     final playlistColumns = await db.rawQuery("PRAGMA table_info('playlists')");
     final hasLiked = playlistColumns.any((c) => c['name'] == 'liked');
@@ -91,7 +97,10 @@ class AppDatabase {
     }
 
     await _migrateLegacyBundledTracks(db);
-    await _ensureDefaultRadioStations(db);
+
+    // Radio stations disabled for now -- sweeps out any already seeded on an
+    // existing install too, not just stopping new ones. Cheap no-op once run.
+    await db.delete('tracks', where: "song = 'RADIO'");
   }
 
   /// The 6 tracks that used to ship bundled as Flutter assets now live on
@@ -124,62 +133,6 @@ class AppDatabase {
         where: 'audio_url = ? AND slug IS NULL',
         whereArgs: [t['oldAudio']],
       );
-    }
-  }
-
-  /// Real Egyptian FM stations (stream URLs sourced from radio-browser.info,
-  /// a public directory) -- self-healed like the schema above so existing
-  /// installs pick up new/changed stations too, not just fresh ones.
-  /// Matched by audio_url so re-running this is a no-op once inserted.
-  Future<void> _ensureDefaultRadioStations(Database db) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    const stations = [
-      {
-        'title': 'NRJ Egypt',
-        'artist': 'Pop Hits · Cairo',
-        'url': 'https://nrjstreaming.ahmed-melege.com/nrjegypt',
-      },
-      {
-        // zeno.fm stream id without its signed session token -- usually still
-        // playable directly, but zeno.fm has been known to rotate these; if
-        // this one goes dead, look up a fresh id at https://www.nogoumfm.net.
-        'title': 'Nogoum FM',
-        'artist': '100.6 FM · Cairo',
-        'url': 'https://stream-159.zeno.fm/qb1zvsykm98uv',
-      },
-      {
-        'title': '9090 FM',
-        'artist': '90.9 FM · Egypt',
-        'url': 'http://9090streaming.mobtada.com/9090FMEGYPT',
-      },
-      {
-        'title': 'On Sport FM',
-        'artist': 'Sports · Egypt',
-        'url': 'https://carina.streamerr.co:2020/stream/OnSportFM',
-      },
-      {
-        'title': 'Sha3by FM',
-        'artist': 'Sha3bi Music · Egypt',
-        'url': 'https://radio95.radioca.st/',
-      },
-    ];
-
-    for (final station in stations) {
-      final existing = await db.query(
-        'tracks',
-        where: 'audio_url = ?',
-        whereArgs: [station['url']],
-        limit: 1,
-      );
-      if (existing.isNotEmpty) continue;
-      await db.insert('tracks', {
-        'title': station['title'],
-        'artist': station['artist'],
-        'song': 'RADIO',
-        'audio_url': station['url'],
-        'liked': 0,
-        'created_at': now,
-      });
     }
   }
 
@@ -234,13 +187,18 @@ class AppDatabase {
       )
     ''');
 
-    // Single-row table -- there's only ever one local profile.
+    // Single-row table -- there's only ever one local profile. google_id /
+    // google_email are populated once the user signs in with Google; both
+    // stay NULL for a local-only profile, and signing out clears them again
+    // without touching display_name/avatar_path/library data.
     await db.execute('''
       CREATE TABLE profile (
         id           INTEGER PRIMARY KEY CHECK (id = 1),
         display_name TEXT NOT NULL,
         avatar_path  TEXT,
-        server_url   TEXT
+        server_url   TEXT,
+        google_id    TEXT,
+        google_email TEXT
       )
     ''');
 

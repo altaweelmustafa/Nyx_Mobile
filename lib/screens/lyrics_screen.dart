@@ -19,6 +19,7 @@ class LyricsScreen extends StatefulWidget {
 class _LyricsScreenState extends State<LyricsScreen> {
   List<LrcLine> _lines = [];
   int _activeIndex = -1;
+  bool _isLoading = true;
   final _scrollController = ScrollController();
   // Key list for scrolling to the active line
   final List<GlobalKey> _keys = [];
@@ -35,6 +36,7 @@ class _LyricsScreenState extends State<LyricsScreen> {
     if (!mounted) return;
     setState(() {
       _lines = lines;
+      _isLoading = false;
       _keys.clear();
       _keys.addAll(List.generate(lines.length, (_) => GlobalKey()));
     });
@@ -141,7 +143,7 @@ class _LyricsScreenState extends State<LyricsScreen> {
             // ── Lyrics ───────────────────────────────────────────────────────
             Expanded(
               child: _lines.isEmpty
-                  ? _emptyState(widget.track.lyricsPath)
+                  ? _emptyState(widget.track.lyricsPath, _isLoading)
                   : NotificationListener<ScrollNotification>(
                       onNotification: (n) {
                         // Detect user scrolling to suppress auto-scroll temporarily
@@ -204,7 +206,17 @@ class _LyricsScreenState extends State<LyricsScreen> {
     );
   }
 
-  Widget _emptyState(String? path) {
+  Widget _emptyState(String? path, bool isLoading) {
+    if (path != null && isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.accent),
+      );
+    }
+
+    final message = path == null
+        ? 'No lyrics available'
+        : "Couldn't load synced lyrics for this track";
+
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -216,7 +228,7 @@ class _LyricsScreenState extends State<LyricsScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            path == null ? 'No lyrics available' : 'Loading lyrics...',
+            message,
             style: const TextStyle(
               fontFamily: AppFonts.sans,
               fontSize: 14,

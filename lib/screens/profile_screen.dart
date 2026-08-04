@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../models/playlist.dart';
 import '../repositories/playlist_repository.dart';
 import '../repositories/profile_repository.dart';
+import '../services/auth_service.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/thumbnail.dart';
 import '../widgets/track_thumbnail.dart';
@@ -91,6 +93,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (confirmed != true || !mounted) return;
+    await context.read<AuthService>().signOut();
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const StartScreen()),
       (route) => false,
@@ -172,6 +176,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            // ── Google account link state ───────────────────────────────────
+            Center(
+              child: Consumer<AuthService>(
+                builder: (context, auth, _) => auth.isSignedIn
+                    ? Text(
+                        auth.email!,
+                        style: const TextStyle(
+                          fontFamily: AppFonts.sans,
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      )
+                    : GestureDetector(
+                        onTap: auth.isLoading ? null : () => auth.signIn().then((_) => _load()),
+                        child: Text(
+                          auth.isLoading ? 'Linking…' : 'Link Google account',
+                          style: const TextStyle(
+                            fontFamily: AppFonts.sans,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      ),
               ),
             ),
 

@@ -145,6 +145,23 @@ class TrackRepository {
     return false;
   }
 
+  /// Deletes synced tracks (slug IS NOT NULL) whose slug is no longer in
+  /// [catalogSlugs] -- mirrors server-side removals (e.g. a track deleted
+  /// from orc's catalog) into the local library on the next sync. Locally
+  /// added tracks (slug IS NULL) are never touched. Refuses to run against
+  /// an empty [catalogSlugs] so a failed/empty fetch can't wipe the library.
+  /// Cascades to playlist_tracks via the existing ON DELETE CASCADE.
+  Future<int> deleteMissingFromCatalog(Set<String> catalogSlugs) async {
+    if (catalogSlugs.isEmpty) return 0;
+    final db = await AppDatabase.instance.database;
+    final placeholders = List.filled(catalogSlugs.length, '?').join(',');
+    return db.delete(
+      'tracks',
+      where: 'slug IS NOT NULL AND slug NOT IN ($placeholders)',
+      whereArgs: catalogSlugs.toList(),
+    );
+  }
+
   /// Inserts a freshly-imported track and returns its new id.
   Future<String> insertTrack({
     required String title,

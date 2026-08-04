@@ -213,6 +213,7 @@ class AudioPlayerService extends ChangeNotifier {
         id: 'jam',
         title: title,
         artist: artist,
+        song: title,
         audioUrl: audioUrl,
         thumbnailPath: thumbnailPath,
       );

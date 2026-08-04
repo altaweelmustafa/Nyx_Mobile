@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import 'shell_screen.dart';
 
@@ -17,6 +19,19 @@ class _StartScreenState extends State<StartScreen> {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const ShellScreen()),
     );
+  }
+
+  Future<void> _continueWithGoogle() async {
+    final auth = context.read<AuthService>();
+    await auth.signIn();
+    if (!mounted) return;
+    if (auth.isSignedIn) {
+      _navigate();
+    } else if (auth.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(auth.error!)),
+      );
+    }
   }
 
   @override
@@ -175,44 +190,52 @@ class _StartScreenState extends State<StartScreen> {
               const SizedBox(height: 12),
 
               // ── Continue with Google ────────────────────────────────────────
-              OutlinedButton(
-                onPressed: _navigate,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.divider),
-                  minimumSize: const Size(double.infinity, 50),
-                  padding: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+              Consumer<AuthService>(
+                builder: (context, auth, _) => OutlinedButton(
+                  onPressed: auth.isLoading ? null : _continueWithGoogle,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textPrimary,
+                    side: const BorderSide(color: AppColors.divider),
+                    minimumSize: const Size(double.infinity, 50),
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
                   ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      // Google logo far left
-                      Image.asset(
-                        'assets/icons/google.png',
-                        width: 20,
-                        height: 20,
-                      ),
-                      // Text centered in remaining space
-                      const Expanded(
-                        child: Text(
-                          'Continue with Google',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: AppFonts.sans,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimary,
+                  child: auth.isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textSecondary),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(
+                            children: [
+                              // Google logo far left
+                              Image.asset(
+                                'assets/icons/google.png',
+                                width: 20,
+                                height: 20,
+                              ),
+                              // Text centered in remaining space
+                              const Expanded(
+                                child: Text(
+                                  'Continue with Google',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontFamily: AppFonts.sans,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              // Invisible balancer so text is truly centered
+                              const SizedBox(width: 20),
+                            ],
                           ),
                         ),
-                      ),
-                      // Invisible balancer so text is truly centered
-                      const SizedBox(width: 20),
-                    ],
-                  ),
                 ),
               ),
 

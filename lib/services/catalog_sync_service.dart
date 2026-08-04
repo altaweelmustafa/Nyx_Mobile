@@ -5,13 +5,21 @@ class SyncResult {
   final int total;
   final int added;
   final int updated;
+  final int removed;
 
-  const SyncResult({required this.total, required this.added, required this.updated});
+  const SyncResult({
+    required this.total,
+    required this.added,
+    required this.updated,
+    required this.removed,
+  });
 }
 
 /// Pulls the track catalog orc has built up on the homelab server
-/// (GET /api/catalog) and upserts it into the local library, keyed by slug
-/// so re-syncing never creates duplicates.
+/// (GET /api/catalog) and mirrors it into the local library, keyed by slug:
+/// upserts everything present (never resets liked/play_count on update),
+/// and removes local synced tracks whose slug is no longer in the catalog
+/// (e.g. a track deleted from orc) so deletions on the server propagate too.
 class CatalogSyncService {
   final _dio = Dio();
   final _trackRepo = TrackRepository();
@@ -23,13 +31,16 @@ class CatalogSyncService {
 
     var added = 0;
     var updated = 0;
+    final catalogSlugs = <String>{};
     for (final entry in tracks) {
+      final slug = entry['slug'] as String;
       final audioPath = entry['audio_path'] as String;
       final thumbnailPath = entry['thumbnail_path'] as String?;
       final lyricsPath = entry['lyrics_path'] as String?;
+      catalogSlugs.add(slug);
 
       final isNew = await _trackRepo.upsertFromCatalog(
-        slug: entry['slug'] as String,
+        slug: slug,
         title: entry['title'] as String,
         artist: entry['artist'] as String,
         audioUrl: '$url/assets/$audioPath',
@@ -43,6 +54,8 @@ class CatalogSyncService {
       }
     }
 
-    return SyncResult(total: tracks.length, added: added, updated: updated);
+    final removed = await _trackRepo.deleteMissingFromCatalog(catalogSlugs);
+
+    return SyncResult(total: tracks.length, added: added, updated: updated, removed: removed);
   }
 }

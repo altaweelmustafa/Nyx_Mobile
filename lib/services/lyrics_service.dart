@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class LrcLine {
@@ -19,8 +20,13 @@ class LyricsService {
       final raw = path.startsWith('http://') || path.startsWith('https://')
           ? (await _dio.get<String>(path)).data ?? ''
           : await rootBundle.loadString(path);
-      return _parse(raw);
+      final lines = _parse(raw);
+      if (lines.isEmpty) {
+        debugPrint('LyricsService.load($path): fetched OK but found no timestamped lines');
+      }
+      return lines;
     } catch (e) {
+      debugPrint('LyricsService.load($path) error: $e');
       return [];
     }
   }

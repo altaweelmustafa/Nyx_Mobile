@@ -4,7 +4,6 @@ import '../theme/app_theme.dart';
 import '../models/track.dart';
 import '../repositories/track_repository.dart';
 import '../services/audio_player_service.dart';
-import '../widgets/thumbnail.dart';
 import '../widgets/track_thumbnail.dart';
 import 'track_view_screen.dart';
 
@@ -19,7 +18,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final _trackRepo = TrackRepository();
   List<Track> _mostPlayed = [];
   List<Track> _recommended = [];
-  List<Track> _radio = [];
   bool _loading = true;
 
   @override
@@ -32,13 +30,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final results = await Future.wait([
       _trackRepo.getMostPlayed(3),
       _trackRepo.getRecommended(3),
-      _trackRepo.getRadioStations(),
     ]);
     if (!mounted) return;
     setState(() {
       _mostPlayed = results[0];
       _recommended = results[1];
-      _radio = results[2];
       _loading = false;
     });
   }
@@ -47,13 +43,6 @@ class _HomeScreenState extends State<HomeScreen> {
     context.read<AudioPlayerService>().playQueue(queue, index);
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => TrackViewScreen(track: queue[index])),
-    );
-  }
-
-  void _playStation(BuildContext context, Track station) {
-    context.read<AudioPlayerService>().play(station);
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TrackViewScreen(track: station)),
     );
   }
 
@@ -92,14 +81,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 32),
                   ],
-
-                  // ── Radio Stations ──────────────────────────────────────────
-                  _SectionHeader(title: 'Radio Stations'),
-                  const SizedBox(height: 16),
-                  _RadioStationRow(
-                    stations: _radio,
-                    onTap: (station) => _playStation(context, station),
-                  ),
 
                   const SizedBox(height: 40),
                 ],
@@ -189,85 +170,6 @@ class _TrackCardRow extends StatelessWidget {
                         fontSize: 12,
                         color: AppColors.textSecondary,
                         fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ── Radio Stations: live streams, playable now -- more get added later ──────
-
-class _RadioStationRow extends StatelessWidget {
-  final List<Track> stations;
-  final void Function(Track station) onTap;
-
-  const _RadioStationRow({required this.stations, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    if (stations.isEmpty) return const SizedBox.shrink();
-    final currentTrackId = context.watch<AudioPlayerService>().currentTrack?.id;
-
-    return SizedBox(
-      height: 168,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: stations.length,
-        itemBuilder: (context, i) {
-          final station = stations[i];
-          final isNowPlaying = station.id == currentTrackId;
-          return Padding(
-            padding: EdgeInsets.only(right: i < stations.length - 1 ? 12 : 0),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => onTap(station),
-              child: SizedBox(
-                width: 120,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Thumbnail(
-                      size: 120,
-                      borderRadius: 10,
-                      child: const Center(
-                        child: Icon(
-                          Icons.radio,
-                          color: AppColors.background,
-                          size: 32,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      station.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: AppFonts.sans,
-                        fontFamilyFallback: AppFonts.fallback,
-                        fontSize: 13,
-                        color: isNowPlaying ? AppColors.accent : AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      station.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontFamily: AppFonts.mono,
-                        fontFamilyFallback: AppFonts.fallback,
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],

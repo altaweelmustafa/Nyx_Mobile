@@ -60,7 +60,8 @@ class _SyncScreenState extends State<SyncScreen> {
         _resultMessage = result.total == 0
             ? 'Server has no tracks in its catalog yet.'
             : 'Synced ${result.total} track${result.total == 1 ? '' : 's'} -- '
-                '${result.added} new, ${result.updated} updated.';
+                '${result.added} new, ${result.updated} updated'
+                '${result.removed > 0 ? ', ${result.removed} removed' : ''}.';
       });
     } catch (e) {
       if (!mounted) return;
@@ -109,7 +110,8 @@ class _SyncScreenState extends State<SyncScreen> {
                     padding: EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
                       'Pulls in everything imported on the homelab server\'s catalog. Safe to run '
-                      'repeatedly -- already-synced tracks just get refreshed, never duplicated.',
+                      'repeatedly -- already-synced tracks just get refreshed, never duplicated, and '
+                      'tracks removed from the server are removed here too.',
                       style: TextStyle(fontFamily: AppFonts.sans, fontSize: 13, color: AppColors.textSecondary),
                     ),
                   ),
