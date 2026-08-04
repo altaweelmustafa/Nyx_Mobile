@@ -1,98 +1,211 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import '../data/mock_data.dart';
+import '../models/playlist.dart';
+import '../repositories/playlist_repository.dart';
+import '../repositories/track_repository.dart';
 import '../widgets/track_thumbnail.dart';
+import 'liked_tracks_screen.dart';
 import 'playlist_screen.dart';
-import 'track_view_screen.dart';
 
-class LibraryScreen extends StatelessWidget {
+class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
+
+  @override
+  State<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends State<LibraryScreen> {
+  final _trackRepo = TrackRepository();
+  final _playlistRepo = PlaylistRepository();
+
+  bool _loading = true;
+  int _likedCount = 0;
+  List<Playlist> _playlists = [];
+  final Map<String, String?> _playlistThumbnails = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final liked = await _trackRepo.getLiked();
+    final playlists = await _playlistRepo.getLiked();
+    final thumbnails = await Future.wait(
+      playlists.map((p) async {
+        final tracks = await _playlistRepo.getTracks(p.id);
+        return MapEntry(p.id, tracks.isNotEmpty ? tracks.first.thumbnailPath : null);
+      }),
+    );
+    if (!mounted) return;
+    setState(() {
+      _likedCount = liked.length;
+      _playlists = playlists;
+      _playlistThumbnails
+        ..clear()
+        ..addEntries(thumbnails);
+      _loading = false;
+    });
+  }
+
+  Future<void> _unlikePlaylist(Playlist playlist) async {
+    await _playlistRepo.setLiked(playlist.id, false);
+    if (!mounted) return;
+    setState(() => _playlists.removeWhere((p) => p.id == playlist.id));
+  }
+
+  Future<void> _createPlaylist() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('New Playlist', style: TextStyle(color: AppColors.textPrimary)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: AppColors.textPrimary),
+          decoration: const InputDecoration(hintText: 'Playlist name', border: OutlineInputBorder()),
+          onSubmitted: (v) => Navigator.of(dialogContext).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+
+    if (name == null || name.isEmpty || !mounted) return;
+    final id = await _playlistRepo.create(name);
+    await _load();
+    if (!mounted) return;
+    final created = _playlists.firstWhere((p) => p.id == id);
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => PlaylistScreen(playlist: created)),
+    );
+    _load();
+  }
+
+  Future<void> _openLikedTracks() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const LikedTracksScreen()),
+    );
+    _load();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 160),
-          children: [
-            // ── Header ────────────────────────────────────────────────────────
-            Text(
-              'Your Library',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 24),
-
-            // ── Liked Tracks ─────────────────────────────────────────────────
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => TrackViewScreen(track: mockTracks[0]),
-                ),
-              ),
-              child: _LibraryRow(
-                leading: Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceHigh,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Icon(
-                    Icons.favorite,
-                    color: AppColors.accent,
-                    size: 24,
-                  ),
-                ),
-                title: 'Liked Tracks',
-                subtitle: '58 TRACKS',
-                trailing: const Icon(
-                  Icons.favorite,
-                  color: AppColors.accent,
-                  size: 20,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 4),
-            const Divider(),
-            const SizedBox(height: 4),
-
-            // ── Playlists ─────────────────────────────────────────────────────
-            ...mockPlaylists.map(
-              (playlist) => Column(
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.accent),
+              )
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 160),
                 children: [
+                  // ── Header ────────────────────────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Your Library',
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Create Playlist',
+                        onPressed: _createPlaylist,
+                        icon: const Icon(
+                          Icons.add_circle_outline,
+                          color: AppColors.textPrimary,
+                          size: 24,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Liked Tracks ─────────────────────────────────────────
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => PlaylistScreen(playlist: playlist),
-                      ),
-                    ),
+                    onTap: _openLikedTracks,
                     child: _LibraryRow(
-                      leading: TrackThumbnail(
-                        size: 52,
-                        borderRadius: 6,
-                        assetPath: playlist.tracks.isNotEmpty ? playlist.tracks.first.thumbnailPath : null,
+                      leading: Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceHigh,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.favorite,
+                          color: AppColors.accent,
+                          size: 24,
+                        ),
                       ),
-                      title: playlist.name,
-                      subtitle: '${playlist.trackCount} TRACKS',
-                      trailing: Icon(
-                        Icons.favorite_border,
-                        color: AppColors.textSecondary,
+                      title: 'Liked Tracks',
+                      subtitle: '$_likedCount TRACKS',
+                      trailing: const Icon(
+                        Icons.favorite,
+                        color: AppColors.accent,
                         size: 20,
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 4),
                   const Divider(),
                   const SizedBox(height: 4),
+
+                  // ── Playlists ─────────────────────────────────────────────
+                  ..._playlists.map(
+                    (playlist) => Column(
+                      children: [
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => PlaylistScreen(playlist: playlist),
+                              ),
+                            );
+                            _load();
+                          },
+                          child: _LibraryRow(
+                            leading: TrackThumbnail(
+                              size: 52,
+                              borderRadius: 6,
+                              assetPath: _playlistThumbnails[playlist.id],
+                            ),
+                            title: playlist.name,
+                            subtitle: '${playlist.trackCount} TRACKS',
+                            trailing: GestureDetector(
+                              onTap: () => _unlikePlaylist(playlist),
+                              child: const Icon(
+                                Icons.favorite,
+                                color: AppColors.accent,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Divider(),
+                        const SizedBox(height: 4),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }

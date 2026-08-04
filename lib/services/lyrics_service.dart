@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 
 class LrcLine {
@@ -8,10 +9,16 @@ class LrcLine {
 }
 
 class LyricsService {
-  static Future<List<LrcLine>> load(String? assetPath) async {
-    if (assetPath == null) return [];
+  static final _dio = Dio();
+
+  /// [path] is either a bundled 'assets/...' path or a full http(s) URL to
+  /// a server-hosted .lrc file.
+  static Future<List<LrcLine>> load(String? path) async {
+    if (path == null) return [];
     try {
-      final raw = await rootBundle.loadString(assetPath);
+      final raw = path.startsWith('http://') || path.startsWith('https://')
+          ? (await _dio.get<String>(path)).data ?? ''
+          : await rootBundle.loadString(path);
       return _parse(raw);
     } catch (e) {
       return [];

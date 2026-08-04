@@ -1,13 +1,101 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import '../data/mock_data.dart';
+import '../models/playlist.dart';
+import '../repositories/playlist_repository.dart';
+import '../repositories/profile_repository.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/thumbnail.dart';
+import '../widgets/track_thumbnail.dart';
+import 'edit_profile_screen.dart';
+import 'jam_screen.dart';
 import 'playlist_screen.dart';
-import 'import_screen.dart';
+import 'start_screen.dart';
+import 'sync_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _playlistRepo = PlaylistRepository();
+  final _profileRepo = ProfileRepository();
+  List<Playlist> _playlists = [];
+  final Map<String, String?> _playlistThumbnails = {};
+  String _displayName = '';
+  String? _avatarPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final playlists = await _playlistRepo.getAll();
+    final name = await _profileRepo.getDisplayName();
+    final avatarPath = await _profileRepo.getAvatarPath();
+    final thumbnails = await Future.wait(
+      playlists.map((p) async {
+        final tracks = await _playlistRepo.getTracks(p.id);
+        return MapEntry(p.id, tracks.isNotEmpty ? tracks.first.thumbnailPath : null);
+      }),
+    );
+    if (!mounted) return;
+    setState(() {
+      _playlists = playlists;
+      _displayName = name;
+      _avatarPath = avatarPath;
+      _playlistThumbnails
+        ..clear()
+        ..addEntries(thumbnails);
+    });
+  }
+
+  Future<void> _toggleLiked(Playlist playlist) async {
+    final liked = !playlist.liked;
+    await _playlistRepo.setLiked(playlist.id, liked);
+    if (!mounted) return;
+    setState(() {
+      final i = _playlists.indexWhere((p) => p.id == playlist.id);
+      if (i != -1) _playlists[i] = playlist.copyWith(liked: liked);
+    });
+  }
+
+  Future<void> _openEditProfile() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+    );
+    _load();
+  }
+
+  Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Log out?', style: TextStyle(color: AppColors.textPrimary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Log out', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const StartScreen()),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,22 +119,37 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const Spacer(),
                   IconButton(
-                    tooltip: 'Import Track (dev)',
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ImportScreen()),
-                    ),
+                    tooltip: 'Sync Library',
+                    onPressed: () async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const SyncScreen()),
+                      );
+                      _load();
+                    },
                     icon: const Icon(
-                      Icons.library_music_outlined,
+                      Icons.sync,
                       color: AppColors.textPrimary,
                       size: 22,
                     ),
                   ),
                   IconButton(
-                    onPressed: () {},
+                    tooltip: 'Roll',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const JamScreen()),
+                    ),
                     icon: const Icon(
-                      Icons.more_horiz,
+                      Icons.podcasts,
                       color: AppColors.textPrimary,
-                      size: 24,
+                      size: 22,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Log out',
+                    onPressed: _logout,
+                    icon: const Icon(
+                      Icons.logout,
+                      color: AppColors.textPrimary,
+                      size: 22,
                     ),
                   ),
                 ],
@@ -56,14 +159,28 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 16),
 
             // ── Avatar ───────────────────────────────────────────────────────
-            const Center(child: CircleThumbnail(size: 100)),
+            Center(child: CircleThumbnail(size: 100, imagePath: _avatarPath)),
+
+            const SizedBox(height: 12),
+
+            Center(
+              child: Text(
+                _displayName,
+                style: const TextStyle(
+                  fontFamily: AppFonts.sans,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
 
             const SizedBox(height: 20),
 
             // ── Edit profile button ──────────────────────────────────────────
             Center(
               child: OutlinedButton(
-                onPressed: () {},
+                onPressed: _openEditProfile,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textPrimary,
                   side: const BorderSide(color: AppColors.divider, width: 1.5),
@@ -84,16 +201,8 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 28),
 
             // ── Stats row ─────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: const [
-                  _StatColumn(value: '23', label: 'PLAYLISTS'),
-                  _StatColumn(value: '58', label: 'FOLLOWERS'),
-                  _StatColumn(value: '43', label: 'FOLLOWING'),
-                ],
-              ),
+            Center(
+              child: _StatColumn(value: '${_playlists.length}', label: 'PLAYLISTS'),
             ),
 
             const SizedBox(height: 36),
@@ -110,14 +219,17 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 16),
 
             // ── Playlist rows ─────────────────────────────────────────────────
-            ...mockPlaylists.map(
+            ..._playlists.map(
               (playlist) => GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => PlaylistScreen(playlist: playlist),
-                  ),
-                ),
+                onTap: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => PlaylistScreen(playlist: playlist),
+                    ),
+                  );
+                  _load();
+                },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -125,30 +237,44 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Thumbnail(size: 64, borderRadius: 6),
+                      TrackThumbnail(
+                        size: 84,
+                        borderRadius: 8,
+                        assetPath: _playlistThumbnails[playlist.id],
+                      ),
                       const SizedBox(width: 14),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            playlist.name,
-                            style: const TextStyle(
-                              fontFamily: AppFonts.sans,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textPrimary,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              playlist.name,
+                              style: const TextStyle(
+                                fontFamily: AppFonts.sans,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            '${playlist.likes} likes',
-                            style: const TextStyle(
-                              fontFamily: AppFonts.sans,
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
+                            const SizedBox(height: 3),
+                            Text(
+                              '${playlist.trackCount} tracks · ${playlist.likes} likes',
+                              style: const TextStyle(
+                                fontFamily: AppFonts.sans,
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => _toggleLiked(playlist),
+                        child: Icon(
+                          playlist.liked ? Icons.favorite : Icons.favorite_border,
+                          color: playlist.liked ? AppColors.accent : AppColors.textSecondary,
+                          size: 20,
+                        ),
                       ),
                     ],
                   ),

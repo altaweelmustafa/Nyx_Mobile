@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Radio streaming, homelab-hosted track data, and Jam's WebSocket
+         host/client both need real network access in release builds too --
+         the debug/profile manifests grant this automatically but release
+         does not. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Lets Edit Profile take a photo directly for the avatar; gallery
+         picking uses the system photo picker and needs no permission. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <!-- Needed to read the currently-connected Bluetooth audio device
          (name + device class) for the mini player's Bluetooth indicator. -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>

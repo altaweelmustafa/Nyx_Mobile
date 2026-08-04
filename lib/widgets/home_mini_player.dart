@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
@@ -34,13 +35,20 @@ class HomeMiniPlayer extends StatelessWidget {
             children: [
 
               // ── Layer 1: album art as background ────────────────────────────
-              if (track.thumbnailPath != null)
-                Image.asset(
-                  track.thumbnailPath!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      Container(color: AppColors.surfaceHigh),
-                ),
+              if (track.thumbnailPath case final path?)
+                if (path.startsWith('http://') || path.startsWith('https://'))
+                  CachedNetworkImage(
+                    imageUrl: path,
+                    fit: BoxFit.cover,
+                    errorWidget: (_, __, ___) => Container(color: AppColors.surfaceHigh),
+                  )
+                else
+                  Image.asset(
+                    path,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Container(color: AppColors.surfaceHigh),
+                  ),
 
               // ── Layer 2: dark gradient overlay so text is readable ──────────
               Container(

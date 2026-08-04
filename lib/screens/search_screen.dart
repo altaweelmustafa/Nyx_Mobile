@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
-import '../data/mock_data.dart';
-import '../widgets/thumbnail.dart';
+import '../models/track.dart';
+import '../repositories/search_history_repository.dart';
+import '../repositories/track_repository.dart';
+import '../services/audio_player_service.dart';
+import '../widgets/track_thumbnail.dart';
 import 'track_view_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -17,14 +21,28 @@ class _SearchScreenState extends State<SearchScreen> {
   bool  _isSearching = false;
   String _query = '';
 
-  late List<String> _history;
+  final _trackRepo = TrackRepository();
+  final _historyRepo = SearchHistoryRepository();
+
+  List<String> _history = [];
+  List<Track> _allTracks = [];
 
   @override
   void initState() {
     super.initState();
-    _history = List.from(mockSearchHistory);
+    _load();
     _controller.addListener(() {
       setState(() => _query = _controller.text);
+    });
+  }
+
+  Future<void> _load() async {
+    final history = await _historyRepo.getAll();
+    final tracks = await _trackRepo.getAll();
+    if (!mounted) return;
+    setState(() {
+      _history = history;
+      _allTracks = tracks;
     });
   }
 
@@ -51,11 +69,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _removeHistory(String item) {
     setState(() => _history.remove(item));
+    _historyRepo.remove(item);
   }
 
-  List<MockTrack> get _results {
+  List<Track> get _results {
     if (_query.isEmpty) return [];
-    return mockTracks
+    return _allTracks
         .where((t) =>
             t.title.toLowerCase().contains(_query.toLowerCase()) ||
             t.artist.toLowerCase().contains(_query.toLowerCase()))
@@ -247,8 +266,8 @@ class _HistoryRow extends StatelessWidget {
 // ── Results list ───────────────────────────────────────────────────────────────
 
 class _ResultsList extends StatelessWidget {
-  final List<MockTrack> results;
-  final void Function(MockTrack) onTap;
+  final List<Track> results;
+  final void Function(Track) onTap;
 
   const _ResultsList({required this.results, required this.onTap});
 
@@ -267,11 +286,14 @@ class _ResultsList extends StatelessWidget {
       );
     }
 
+    final currentTrackId = context.watch<AudioPlayerService>().currentTrack?.id;
+
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: results.length,
       itemBuilder: (context, i) {
         final track = results[i];
+        final isNowPlaying = track.id == currentTrackId;
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => onTap(track),
@@ -279,7 +301,7 @@ class _ResultsList extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(
               children: [
-                Thumbnail(size: 46, borderRadius: 6),
+                TrackThumbnail(size: 46, assetPath: track.thumbnailPath, borderRadius: 6),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -287,16 +309,16 @@ class _ResultsList extends StatelessWidget {
                     children: [
                       Text(
                         track.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: AppFonts.sans,
                           fontSize: 15,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
+                          color: isNowPlaying ? AppColors.accent : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${track.song}  •  ${track.artist}',
+                        track.artist,
                         style: const TextStyle(
                           fontFamily: AppFonts.sans,
                           fontSize: 12,

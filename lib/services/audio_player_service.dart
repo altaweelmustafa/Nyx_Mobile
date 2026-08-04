@@ -2,7 +2,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio/just_audio.dart' as ja;
-import '../data/mock_data.dart';
+import '../models/track.dart';
+import '../repositories/track_repository.dart';
 
 enum LoopMode { none, one, all }
 
@@ -16,9 +17,10 @@ class AudioPlayerService extends ChangeNotifier {
 
   // ── Internal state ─────────────────────────────────────────────────────────
   final AudioPlayer _player = AudioPlayer();
+  final _trackRepo = TrackRepository();
   final _rng = Random();
 
-  MockTrack? _currentTrack;
+  Track? _currentTrack;
   bool      _isPlaying = false;
   bool      _isShuffle = false;
   LoopMode  _loopMode  = LoopMode.none;
@@ -26,14 +28,14 @@ class AudioPlayerService extends ChangeNotifier {
   Duration  _duration  = Duration.zero;
   bool      _isLoading = false;
 
-  List<MockTrack> _queue        = [];
+  List<Track> _queue        = [];
   int             _currentIndex = -1;
 
   // True while a track-to-track transition is in flight; blocks spurious completed events.
   bool _isAdvancing = false;
 
   // ── Public getters ─────────────────────────────────────────────────────────
-  MockTrack? get currentTrack => _currentTrack;
+  Track? get currentTrack => _currentTrack;
   bool       get isPlaying    => _isPlaying;
   bool       get isShuffle    => _isShuffle;
   LoopMode   get loopMode     => _loopMode;
@@ -103,7 +105,7 @@ class AudioPlayerService extends ChangeNotifier {
 
   // ── Public controls ────────────────────────────────────────────────────────
 
-  Future<void> play(MockTrack track) async {
+  Future<void> play(Track track) async {
     if (_currentTrack?.id == track.id && !_player.processingState.equals(ProcessingState.idle)) {
       await _player.play();
       return;
@@ -121,7 +123,7 @@ class AudioPlayerService extends ChangeNotifier {
   }
 
   /// Set a full queue and start playing from [index].
-  Future<void> playQueue(List<MockTrack> tracks, int index) async {
+  Future<void> playQueue(List<Track> tracks, int index) async {
     _queue = List.from(tracks);
     _currentIndex = index.clamp(0, tracks.length - 1);
     await _loadAndPlay(_queue[_currentIndex]);
@@ -174,7 +176,7 @@ class AudioPlayerService extends ChangeNotifier {
     await _loadAndPlay(_queue[_currentIndex]);
   }
 
-  Future<void> _loadAndPlay(MockTrack track) async {
+  Future<void> _loadAndPlay(Track track) async {
     _currentTrack = track;
     _isLoading    = true;
     _position     = Duration.zero;
@@ -186,10 +188,48 @@ class AudioPlayerService extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       await _player.play();
+      _trackRepo.incrementPlayCount(track.id);
     } catch (e) {
       _isLoading = false;
       debugPrint('AudioPlayerService._loadAndPlay() error: $e');
       notifyListeners();
+    }
+  }
+
+  /// Applies a playback snapshot received from a Jam host: loads the same
+  /// track by URL if it isn't already playing, corrects drift past a small
+  /// threshold, and mirrors play/pause. Used only on the follower side of a
+  /// Jam session -- the track doesn't need to exist in the local DB.
+  Future<void> playRemote({
+    required String title,
+    required String artist,
+    required String audioUrl,
+    String? thumbnailPath,
+    required bool isPlaying,
+    required int positionMs,
+  }) async {
+    if (_currentTrack?.audioUrl != audioUrl) {
+      final remoteTrack = Track(
+        id: 'jam',
+        title: title,
+        artist: artist,
+        audioUrl: audioUrl,
+        thumbnailPath: thumbnailPath,
+      );
+      _queue = [remoteTrack];
+      _currentIndex = 0;
+      await _loadAndPlay(remoteTrack);
+    }
+
+    final drift = Duration(milliseconds: positionMs) - _position;
+    if (drift.inMilliseconds.abs() > 1500) {
+      await _player.seek(Duration(milliseconds: positionMs));
+    }
+
+    if (isPlaying && !_isPlaying) {
+      await _player.play();
+    } else if (!isPlaying && _isPlaying) {
+      await _player.pause();
     }
   }
 

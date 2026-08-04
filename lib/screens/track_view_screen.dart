@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
-import '../data/mock_data.dart';
+import '../models/playlist.dart';
+import '../models/track.dart';
+import '../repositories/playlist_repository.dart';
+import '../repositories/track_repository.dart';
 import '../services/audio_player_service.dart';
+import '../services/jam_service.dart';
 import '../widgets/bluetooth_indicator.dart';
 import '../widgets/loop_mode_button.dart';
 import '../services/waveform_service.dart';
+import '../widgets/options_sheet.dart';
 import '../widgets/track_thumbnail.dart';
 import '../widgets/waveform_scrubber.dart';
 import 'lyrics_screen.dart';
 
 class TrackViewScreen extends StatefulWidget {
-  final MockTrack track;
+  final Track track;
 
   const TrackViewScreen({super.key, required this.track});
 
@@ -20,6 +26,8 @@ class TrackViewScreen extends StatefulWidget {
 }
 
 class _TrackViewScreenState extends State<TrackViewScreen> {
+  final _trackRepo = TrackRepository();
+  final _playlistRepo = PlaylistRepository();
   late bool _liked;
   double? _dragProgress;
   List<double>? _waveformBars;
@@ -55,13 +63,13 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
     }
   }
 
-  void _maybeReloadWaveform(MockTrack track) {
+  void _maybeReloadWaveform(Track track) {
     if (track.id == _loadedTrackId) return;
     _loadedTrackId = track.id;
     _loadWaveform(track);
   }
 
-  Future<void> _loadWaveform(MockTrack track) async {
+  Future<void> _loadWaveform(Track track) async {
     final url = track.audioUrl;
     final assetPath = url.startsWith('asset:///assets/')
         ? url.replaceFirst('asset:///', '')
@@ -76,11 +84,138 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
     super.dispose();
   }
 
+  void _share(Track track) {
+    SharePlus.instance.share(
+      ShareParams(text: '${track.title} — ${track.artist}'),
+    );
+  }
+
+  Future<void> _addToPlaylist(Track track) async {
+    final playlists = await _playlistRepo.getAll();
+    if (!mounted) return;
+
+    final selected = await showModalBottomSheet<Playlist>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Text(
+                'Add to Playlist',
+                style: TextStyle(
+                  fontFamily: AppFonts.sans,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (playlists.isEmpty)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 4, 20, 24),
+                child: Text(
+                  'No playlists yet.',
+                  style: TextStyle(
+                    fontFamily: AppFonts.sans,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              )
+            else
+              ...playlists.map(
+                (p) => ListTile(
+                  leading: const Icon(Icons.queue_music, color: AppColors.textSecondary),
+                  title: Text(
+                    p.name,
+                    style: const TextStyle(
+                      fontFamily: AppFonts.sans,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  onTap: () => Navigator.of(sheetContext).pop(p),
+                ),
+              ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+
+    if (selected == null || !mounted) return;
+    await _playlistRepo.addTrack(selected.id, track.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Added to '${selected.name}'")),
+    );
+  }
+
+  void _showTrackOptions(Track track) {
+    showOptionsSheet(
+      context,
+      title: track.title,
+      options: [
+        SheetOption(
+          icon: Icons.playlist_add,
+          label: 'Add to Playlist',
+          onTap: () => _addToPlaylist(track),
+        ),
+        SheetOption(
+          icon: Icons.share_outlined,
+          label: 'Share',
+          onTap: () => _share(track),
+        ),
+        SheetOption(
+          icon: Icons.delete_outline,
+          label: 'Remove from Library',
+          destructive: true,
+          onTap: () => _removeFromLibrary(track),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _removeFromLibrary(Track track) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Remove from Library?', style: TextStyle(color: AppColors.textPrimary)),
+        content: Text(
+          '"${track.title}" will be permanently deleted.',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Remove', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    await _trackRepo.deleteTrack(track.id);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final svc = context.watch<AudioPlayerService>();
     final track = svc.currentTrack ?? widget.track;
     final progress = _dragProgress ?? svc.progress;
+    final following = context.watch<JamService>().role == JamRole.client;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -115,7 +250,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () => _showTrackOptions(track),
                     icon: const Icon(
                       Icons.more_vert,
                       color: AppColors.textPrimary,
@@ -174,7 +309,11 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => setState(() => _liked = !_liked),
+                    onTap: () {
+                      final liked = !_liked;
+                      setState(() => _liked = liked);
+                      _trackRepo.setLiked(track.id, liked);
+                    },
                     child: Icon(
                       _liked ? Icons.favorite : Icons.favorite_border,
                       color: _liked
@@ -210,13 +349,26 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                       progress: progress,
                       height: 48,
                       bars: _waveformBars,
-                      onChanged: (v) => setState(() => _dragProgress = v),
-                      onChangeEnd: (v) {
-                        setState(() => _dragProgress = null);
-                        svc.seekToFraction(v);
-                      },
+                      onChanged: following ? null : (v) => setState(() => _dragProgress = v),
+                      onChangeEnd: following
+                          ? null
+                          : (v) {
+                              setState(() => _dragProgress = null);
+                              svc.seekToFraction(v);
+                            },
                     ),
             ),
+
+            if (following) ...[
+              const SizedBox(height: 6),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 28),
+                child: Text(
+                  'Host is in control during a Roll',
+                  style: TextStyle(fontFamily: AppFonts.sans, fontSize: 11, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 6),
 
@@ -251,61 +403,67 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
             // ── Transport controls ───────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GestureDetector(
-                    onTap: svc.toggleShuffle,
-                    child: Icon(
-                      Icons.shuffle,
-                      color: svc.isShuffle
-                          ? AppColors.accent
-                          : AppColors.textPrimary,
-                      size: 24,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: svc.playPrevious,
-                    child: const Icon(
-                      Icons.skip_previous,
-                      color: AppColors.textPrimary,
-                      size: 36,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: svc.togglePlayPause,
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: const BoxDecoration(
-                        color: AppColors.textPrimary,
-                        shape: BoxShape.circle,
+              child: Opacity(
+                opacity: following ? 0.4 : 1.0,
+                child: IgnorePointer(
+                  ignoring: following,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      GestureDetector(
+                        onTap: svc.toggleShuffle,
+                        child: Icon(
+                          Icons.shuffle,
+                          color: svc.isShuffle
+                              ? AppColors.accent
+                              : AppColors.textPrimary,
+                          size: 24,
+                        ),
                       ),
-                      child: svc.isLoading
-                          ? const Padding(
-                              padding: EdgeInsets.all(16),
-                              child: CircularProgressIndicator(
-                                color: AppColors.background,
-                                strokeWidth: 2.5,
-                              ),
-                            )
-                          : Icon(
-                              svc.isPlaying ? Icons.pause : Icons.play_arrow,
-                              color: AppColors.background,
-                              size: 32,
-                            ),
-                    ),
+                      GestureDetector(
+                        onTap: svc.playPrevious,
+                        child: const Icon(
+                          Icons.skip_previous,
+                          color: AppColors.textPrimary,
+                          size: 36,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: svc.togglePlayPause,
+                        child: Container(
+                          width: 60,
+                          height: 60,
+                          decoration: const BoxDecoration(
+                            color: AppColors.textPrimary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: svc.isLoading
+                              ? const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: CircularProgressIndicator(
+                                    color: AppColors.background,
+                                    strokeWidth: 2.5,
+                                  ),
+                                )
+                              : Icon(
+                                  svc.isPlaying ? Icons.pause : Icons.play_arrow,
+                                  color: AppColors.background,
+                                  size: 32,
+                                ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: svc.playNext,
+                        child: const Icon(
+                          Icons.skip_next,
+                          color: AppColors.textPrimary,
+                          size: 36,
+                        ),
+                      ),
+                      LoopModeButton(loopMode: svc.loopMode, onTap: svc.toggleRepeat, size: 24),
+                    ],
                   ),
-                  GestureDetector(
-                    onTap: svc.playNext,
-                    child: const Icon(
-                      Icons.skip_next,
-                      color: AppColors.textPrimary,
-                      size: 36,
-                    ),
-                  ),
-                  LoopModeButton(loopMode: svc.loopMode, onTap: svc.toggleRepeat, size: 24),
-                ],
+                ),
               ),
             ),
 
@@ -333,9 +491,9 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _ActionButton(
-                    icon: Icons.queue_music,
-                    label: 'Queue',
-                    onTap: () {},
+                    icon: Icons.playlist_add,
+                    label: 'Playlist',
+                    onTap: () => _addToPlaylist(track),
                   ),
                   _ActionButton(
                     icon: Icons.lyrics_outlined,
@@ -349,12 +507,12 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                   _ActionButton(
                     icon: Icons.share_outlined,
                     label: 'Share',
-                    onTap: () {},
+                    onTap: () => _share(track),
                   ),
                   _ActionButton(
                     icon: Icons.more_horiz,
                     label: 'More',
-                    onTap: () {},
+                    onTap: () => _showTrackOptions(track),
                   ),
                 ],
               ),

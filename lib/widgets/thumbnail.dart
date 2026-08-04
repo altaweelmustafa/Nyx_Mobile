@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -29,17 +30,23 @@ class Thumbnail extends StatelessWidget {
 
 class CircleThumbnail extends StatelessWidget {
   final double size;
+  final String? imagePath; // local filesystem path, e.g. the saved avatar
 
-  const CircleThumbnail({super.key, required this.size});
+  const CircleThumbnail({super.key, required this.size, this.imagePath});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: const BoxDecoration(
-        color: AppColors.placeholder,
-        shape: BoxShape.circle,
+    return ClipOval(
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: imagePath != null
+            ? Image.file(
+                File(imagePath!),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const ColoredBox(color: AppColors.placeholder),
+              )
+            : const ColoredBox(color: AppColors.placeholder),
       ),
     );
   }

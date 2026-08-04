@@ -1,30 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
-import '../data/mock_data.dart';
+import '../models/track.dart';
+import '../repositories/track_repository.dart';
 import '../services/audio_player_service.dart';
 import '../widgets/thumbnail.dart';
 import '../widgets/track_thumbnail.dart';
 import 'track_view_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
-  // Real songs vs. live radio streams -- kept separate since radio gets its
-  // own row and plays as a single station, not a skippable queue.
-  List<MockTrack> get _forYouTracks =>
-      mockTracks.where((t) => t.song != 'RADIO').toList();
-  List<MockTrack> get _radioStations =>
-      mockTracks.where((t) => t.song == 'RADIO').toList();
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
-  void _play(BuildContext context, List<MockTrack> queue, int index) {
+class _HomeScreenState extends State<HomeScreen> {
+  final _trackRepo = TrackRepository();
+  List<Track> _mostPlayed = [];
+  List<Track> _recommended = [];
+  List<Track> _radio = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final results = await Future.wait([
+      _trackRepo.getMostPlayed(3),
+      _trackRepo.getRecommended(3),
+      _trackRepo.getRadioStations(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _mostPlayed = results[0];
+      _recommended = results[1];
+      _radio = results[2];
+      _loading = false;
+    });
+  }
+
+  void _play(BuildContext context, List<Track> queue, int index) {
     context.read<AudioPlayerService>().playQueue(queue, index);
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => TrackViewScreen(track: queue[index])),
     );
   }
 
-  void _playStation(BuildContext context, MockTrack station) {
+  void _playStation(BuildContext context, Track station) {
     context.read<AudioPlayerService>().play(station);
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => TrackViewScreen(track: station)),
@@ -33,38 +59,51 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final forYou = _forYouTracks;
-    final radio = _radioStations;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 160),
-          children: [
-            const SizedBox(height: 24),
+        child: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.accent),
+              )
+            : ListView(
+                padding: const EdgeInsets.only(bottom: 160),
+                children: [
+                  const SizedBox(height: 24),
 
-            // ── For You ──────────────────────────────────────────────────────
-            _SectionHeader(title: 'For You'),
-            const SizedBox(height: 16),
-            _TrackCardRow(
-              tracks: forYou,
-              onTap: (i) => _play(context, forYou, i),
-            ),
+                  // ── Most Played ──────────────────────────────────────────────
+                  if (_mostPlayed.isNotEmpty) ...[
+                    _SectionHeader(title: 'Most Played'),
+                    const SizedBox(height: 16),
+                    _TrackCardRow(
+                      tracks: _mostPlayed,
+                      onTap: (i) => _play(context, _mostPlayed, i),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
 
-            const SizedBox(height: 32),
+                  // ── Recommended ──────────────────────────────────────────────
+                  if (_recommended.isNotEmpty) ...[
+                    _SectionHeader(title: 'Recommended For You'),
+                    const SizedBox(height: 16),
+                    _TrackCardRow(
+                      tracks: _recommended,
+                      onTap: (i) => _play(context, _recommended, i),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
 
-            // ── Radio Stations ──────────────────────────────────────────────
-            _SectionHeader(title: 'Radio Stations'),
-            const SizedBox(height: 16),
-            _RadioStationRow(
-              stations: radio,
-              onTap: (station) => _playStation(context, station),
-            ),
+                  // ── Radio Stations ──────────────────────────────────────────
+                  _SectionHeader(title: 'Radio Stations'),
+                  const SizedBox(height: 16),
+                  _RadioStationRow(
+                    stations: _radio,
+                    onTap: (station) => _playStation(context, station),
+                  ),
 
-            const SizedBox(height: 40),
-          ],
-        ),
+                  const SizedBox(height: 40),
+                ],
+              ),
       ),
     );
   }
@@ -92,7 +131,7 @@ class _SectionHeader extends StatelessWidget {
 // ── For You: real, playable tracks ───────────────────────────────────────────
 
 class _TrackCardRow extends StatelessWidget {
-  final List<MockTrack> tracks;
+  final List<Track> tracks;
   final void Function(int index) onTap;
 
   const _TrackCardRow({required this.tracks, required this.onTap});
@@ -100,6 +139,7 @@ class _TrackCardRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (tracks.isEmpty) return const SizedBox.shrink();
+    final currentTrackId = context.watch<AudioPlayerService>().currentTrack?.id;
 
     return SizedBox(
       height: 188,
@@ -109,6 +149,7 @@ class _TrackCardRow extends StatelessWidget {
         itemCount: tracks.length,
         itemBuilder: (context, i) {
           final track = tracks[i];
+          final isNowPlaying = track.id == currentTrackId;
           return Padding(
             padding: EdgeInsets.only(right: i < tracks.length - 1 ? 12 : 0),
             child: GestureDetector(
@@ -129,11 +170,11 @@ class _TrackCardRow extends StatelessWidget {
                       track.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: AppFonts.sans,
                         fontFamilyFallback: AppFonts.fallback,
                         fontSize: 13,
-                        color: AppColors.textPrimary,
+                        color: isNowPlaying ? AppColors.accent : AppColors.textPrimary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -164,14 +205,15 @@ class _TrackCardRow extends StatelessWidget {
 // ── Radio Stations: live streams, playable now -- more get added later ──────
 
 class _RadioStationRow extends StatelessWidget {
-  final List<MockTrack> stations;
-  final void Function(MockTrack station) onTap;
+  final List<Track> stations;
+  final void Function(Track station) onTap;
 
   const _RadioStationRow({required this.stations, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     if (stations.isEmpty) return const SizedBox.shrink();
+    final currentTrackId = context.watch<AudioPlayerService>().currentTrack?.id;
 
     return SizedBox(
       height: 168,
@@ -181,6 +223,7 @@ class _RadioStationRow extends StatelessWidget {
         itemCount: stations.length,
         itemBuilder: (context, i) {
           final station = stations[i];
+          final isNowPlaying = station.id == currentTrackId;
           return Padding(
             padding: EdgeInsets.only(right: i < stations.length - 1 ? 12 : 0),
             child: GestureDetector(
@@ -207,11 +250,11 @@ class _RadioStationRow extends StatelessWidget {
                       station.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: AppFonts.sans,
                         fontFamilyFallback: AppFonts.fallback,
                         fontSize: 13,
-                        color: AppColors.textPrimary,
+                        color: isNowPlaying ? AppColors.accent : AppColors.textPrimary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),

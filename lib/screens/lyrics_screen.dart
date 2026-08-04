@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
-import '../data/mock_data.dart';
+import '../models/track.dart';
 import '../services/lyrics_service.dart';
 import '../services/audio_player_service.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/track_thumbnail.dart';
 
 class LyricsScreen extends StatefulWidget {
-  final MockTrack track;
+  final Track track;
 
   const LyricsScreen({super.key, required this.track});
 
