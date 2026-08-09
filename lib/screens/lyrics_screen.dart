@@ -96,6 +96,7 @@ class _LyricsScreenState extends State<LyricsScreen> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: AppFonts.sans,
+                        fontFamilyFallback: AppFonts.fallback,
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
@@ -123,6 +124,7 @@ class _LyricsScreenState extends State<LyricsScreen> {
               widget.track.title,
               style: const TextStyle(
                 fontFamily: AppFonts.sans,
+                fontFamilyFallback: AppFonts.fallback,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
@@ -133,6 +135,7 @@ class _LyricsScreenState extends State<LyricsScreen> {
               widget.track.artist,
               style: const TextStyle(
                 fontFamily: AppFonts.sans,
+                fontFamilyFallback: AppFonts.fallback,
                 fontSize: 12,
                 color: AppColors.textSecondary,
               ),
@@ -180,6 +183,7 @@ class _LyricsScreenState extends State<LyricsScreen> {
                                 duration: const Duration(milliseconds: 200),
                                 style: TextStyle(
                                   fontFamily: AppFonts.sans,
+                                  fontFamilyFallback: AppFonts.fallback,
                                   fontSize: isActive ? 18 : 14,
                                   fontWeight: isActive
                                       ? FontWeight.w700
@@ -231,6 +235,7 @@ class _LyricsScreenState extends State<LyricsScreen> {
             message,
             style: const TextStyle(
               fontFamily: AppFonts.sans,
+              fontFamilyFallback: AppFonts.fallback,
               fontSize: 14,
               color: AppColors.textSecondary,
             ),

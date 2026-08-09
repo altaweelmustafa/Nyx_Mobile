@@ -15,7 +15,7 @@ class AppColors {
 class AppFonts {
   static const sans = 'IBMPlexSans';
   static const mono = 'IBMPlexMono';
-  static const arabic = 'Almarai';
+  static const arabic = 'Cairo';
 
   /// Glyphs the Latin faces above don't cover (Arabic script, etc.) fall
   /// back to this automatically -- attach it to any TextStyle that doesn't

@@ -31,6 +31,11 @@ class AudioPlayerService extends ChangeNotifier {
   List<Track> _queue        = [];
   int             _currentIndex = -1;
 
+  // Shuffle-bag: indices not yet played in the current pass through the
+  // queue. Drained one at a time so every track plays once before any
+  // repeats; refilled (excluding the just-finished track) once empty.
+  List<int> _shuffleBag = [];
+
   // True while a track-to-track transition is in flight; blocks spurious completed events.
   bool _isAdvancing = false;
 
@@ -118,6 +123,7 @@ class AudioPlayerService extends ChangeNotifier {
     } else {
       _currentIndex = existingIndex;
     }
+    if (_isShuffle) _refillShuffleBag();
 
     await _loadAndPlay(track);
   }
@@ -126,6 +132,7 @@ class AudioPlayerService extends ChangeNotifier {
   Future<void> playQueue(List<Track> tracks, int index) async {
     _queue = List.from(tracks);
     _currentIndex = index.clamp(0, tracks.length - 1);
+    if (_isShuffle) _refillShuffleBag();
     await _loadAndPlay(_queue[_currentIndex]);
   }
 
@@ -149,13 +156,24 @@ class AudioPlayerService extends ChangeNotifier {
     int next;
 
     if (_isShuffle) {
-      final others = [for (int i = 0; i < _queue.length; i++) if (i != _currentIndex) i];
-      if (others.isEmpty) {
+      if (_queue.length <= 1) {
         await _player.seek(Duration.zero);
         await _player.play();
         return;
       }
-      next = others[_rng.nextInt(others.length)];
+      if (_shuffleBag.isEmpty) {
+        // Full pass through the queue just completed.
+        if (!wrap) {
+          // Mirrors the non-shuffle end-of-queue stop below -- don't seek
+          // here, seeking on a completed player can auto-restart playback
+          // on the media_kit backend.
+          _isPlaying = false;
+          notifyListeners();
+          return;
+        }
+        _refillShuffleBag();
+      }
+      next = _shuffleBag.removeLast();
     } else {
       next = _currentIndex + 1;
       if (next >= _queue.length) {
@@ -256,7 +274,19 @@ class AudioPlayerService extends ChangeNotifier {
 
   void toggleShuffle() {
     _isShuffle = !_isShuffle;
+    if (_isShuffle) {
+      _refillShuffleBag();
+    } else {
+      _shuffleBag = [];
+    }
     notifyListeners();
+  }
+
+  /// Rebuilds the shuffle-bag with every queue index except the currently
+  /// playing one, in a fresh random order.
+  void _refillShuffleBag() {
+    _shuffleBag = [for (int i = 0; i < _queue.length; i++) if (i != _currentIndex) i];
+    _shuffleBag.shuffle(_rng);
   }
 
   /// Cycles: none → one → all → none

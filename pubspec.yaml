@@ -68,7 +68,7 @@ flutter:
     - assets/lyrics/
     - assets/fonts/ibm-plex-sans/complete/ttf/
     - assets/fonts/ibm-plex-mono/fonts/complete/ttf/
-    - assets/fonts/almarai/
+    - assets/fonts/cairo/
 
   fonts:
     - family: IBMPlexSans
@@ -85,13 +85,6 @@ flutter:
         - asset: assets/fonts/ibm-plex-mono/fonts/complete/ttf/IBMPlexMono-Bold.ttf
           weight: 700
 
-    - family: Almarai
+    - family: Cairo
       fonts:
-        - asset: assets/fonts/almarai/Almarai-Light.ttf
-          weight: 300
-        - asset: assets/fonts/almarai/Almarai-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/almarai/Almarai-Bold.ttf
-          weight: 700
-        - asset: assets/fonts/almarai/Almarai-ExtraBold.ttf
-          weight: 800
+        - asset: assets/fonts/cairo/Cairo-Variable.ttf
