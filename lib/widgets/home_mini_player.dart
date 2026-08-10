@@ -43,7 +43,6 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
       onTap: widget.onTap,
       child: Container(
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-        height: 200,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: AppColors.surfaceHigh, // fallback if no art
@@ -51,39 +50,47 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Stack(
-            fit: StackFit.expand,
+            // No StackFit.expand / fixed height here on purpose -- the card
+            // sizes itself to whatever the content column below actually
+            // needs, so it can never overflow on a shorter screen or a
+            // larger text-scale setting. The art + gradient layers are
+            // Positioned.fill so they don't factor into that sizing.
             children: [
               // ── Layer 1: album art as background ────────────────────────────
               if (track.thumbnailPath case final path?)
-                if (path.startsWith('http://') || path.startsWith('https://'))
-                  CachedNetworkImage(
-                    imageUrl: path,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) =>
-                        Container(color: AppColors.surfaceHigh),
-                  )
-                else
-                  Image.asset(
-                    path,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: AppColors.surfaceHigh),
-                  ),
+                Positioned.fill(
+                  child:
+                      path.startsWith('http://') || path.startsWith('https://')
+                      ? CachedNetworkImage(
+                          imageUrl: path,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) =>
+                              Container(color: AppColors.surfaceHigh),
+                        )
+                      : Image.asset(
+                          path,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              Container(color: AppColors.surfaceHigh),
+                        ),
+                ),
 
               // ── Layer 2: color-tinted gradient overlay so text is readable
               // and the wash matches the art, Spotify-style ────────────────
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      (_tint == null
-                              ? Colors.black
-                              : Color.lerp(_tint, Colors.black, 0.35)!)
-                          .withOpacity(0.4),
-                      Colors.black.withOpacity(0.8),
-                    ],
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        (_tint == null
+                                ? Colors.black
+                                : Color.lerp(_tint, Colors.black, 0.35)!)
+                            .withOpacity(0.4),
+                        Colors.black.withOpacity(0.8),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -92,12 +99,17 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Nyx logo top-left
-                    Image.asset('assets/icons/nyx_logo.png', width: 48, height: 48),
+                    Image.asset(
+                      'assets/icons/nyx_logo.png',
+                      width: 48,
+                      height: 48,
+                    ),
 
-                    const Spacer(flex: 1),
+                    const SizedBox(height: 40),
 
                     // Title
                     Text(

@@ -56,7 +56,11 @@ class _JamScreenState extends State<JamScreen> {
             children: [
               IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.arrow_back_ios_new, color: AppColors.textPrimary, size: 20),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new,
+                  color: AppColors.textPrimary,
+                  size: 20,
+                ),
               ),
               const Padding(
                 padding: EdgeInsets.only(left: 12),
@@ -170,155 +174,208 @@ class _IdleBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 32),
-
-        // ── Icon ────────────────────────────────────────────────────────
-        Container(
-          width: 96,
-          height: 96,
-          decoration: BoxDecoration(
-            color: AppColors.surfaceHigh,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: const Center(
-            child: Icon(Icons.podcasts, color: AppColors.textSecondary, size: 36),
-          ),
-        ),
-
-        const SizedBox(height: 32),
-
-        // ── Description ────────────────────────────────────────────────
-        RichText(
-          textAlign: TextAlign.center,
-          text: const TextSpan(
-            style: TextStyle(
-              fontFamily: AppFonts.sans,
-              fontSize: 15,
-              height: 1.5,
-              color: AppColors.textPrimary,
-            ),
-            children: [
-              TextSpan(text: 'Listen together through '),
-              TextSpan(text: 'Tailscale', style: TextStyle(fontWeight: FontWeight.w700)),
-              TextSpan(text: '.\nOne device hosts a '),
-              TextSpan(text: 'Roll', style: TextStyle(fontWeight: FontWeight.w700)),
-              TextSpan(text: ' and the other joins it'),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 40),
-
-        // ── Host ────────────────────────────────────────────────────────
-        _RollPillButton(
-          label: 'Host a Roll',
-          background: AppColors.accent,
-          onPressed: busy ? null : onStartHosting,
-        ),
-
-        const SizedBox(height: 56),
-
-        // ── Join ────────────────────────────────────────────────────────
-        TextField(
-          controller: usernameController,
-          style: const TextStyle(fontFamily: AppFonts.sans, color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            hintText: 'Username',
-            hintStyle: const TextStyle(fontFamily: AppFonts.sans, color: AppColors.textSecondary),
-            filled: true,
-            fillColor: AppColors.surfaceHigh,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: addressController,
-          style: const TextStyle(fontFamily: AppFonts.sans, color: AppColors.textPrimary),
-          decoration: InputDecoration(
-            hintText: 'Tailscale IP',
-            hintStyle: const TextStyle(fontFamily: AppFonts.sans, color: AppColors.textSecondary),
-            filled: true,
-            fillColor: AppColors.surfaceHigh,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-          ),
-        ),
-        const SizedBox(height: 12),
-        _RollPillButton(
-          label: 'Join a Roll',
-          background: AppColors.textPrimary,
-          onPressed: busy ? null : onJoin,
-        ),
-
-        if (error != null) ...[
-          const SizedBox(height: 16),
-          Text(error!, style: const TextStyle(fontFamily: AppFonts.sans, fontSize: 12, color: Colors.redAccent)),
-        ],
-
-        if (recents.isNotEmpty) ...[
+    return SingleChildScrollView(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        children: [
           const SizedBox(height: 32),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Recent',
-              style: TextStyle(
-                fontFamily: AppFonts.sans,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+
+          // ── Icon ────────────────────────────────────────────────────────
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceHigh,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.podcasts,
                 color: AppColors.textSecondary,
+                size: 36,
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          ...recents.map(
-            (recent) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: InkWell(
+
+          const SizedBox(height: 32),
+
+          // ── Description ────────────────────────────────────────────────
+          RichText(
+            textAlign: TextAlign.center,
+            text: const TextSpan(
+              style: TextStyle(
+                fontFamily: AppFonts.sans,
+                fontSize: 15,
+                height: 1.5,
+                color: AppColors.textPrimary,
+              ),
+              children: [
+                TextSpan(text: 'Listen together through '),
+                TextSpan(
+                  text: 'Tailscale',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                TextSpan(text: '.\nOne device hosts a '),
+                TextSpan(
+                  text: 'Roll',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                TextSpan(text: ' and the other joins it'),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 40),
+
+          // ── Host ────────────────────────────────────────────────────────
+          _RollPillButton(
+            label: 'Host a Roll',
+            background: AppColors.accent,
+            onPressed: busy ? null : onStartHosting,
+          ),
+
+          const SizedBox(height: 56),
+
+          // ── Join ────────────────────────────────────────────────────────
+          TextField(
+            controller: usernameController,
+            style: const TextStyle(
+              fontFamily: AppFonts.sans,
+              color: AppColors.textPrimary,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Username',
+              hintStyle: const TextStyle(
+                fontFamily: AppFonts.sans,
+                color: AppColors.textSecondary,
+              ),
+              filled: true,
+              fillColor: AppColors.surfaceHigh,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 16,
+              ),
+              border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                onTap: busy ? null : () => onSelectRecent(recent),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceHigh,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.history, color: AppColors.textSecondary, size: 18),
-                      const SizedBox(width: 12),
-                      Text(
-                        recent.username,
-                        style: const TextStyle(
-                          fontFamily: AppFonts.sans,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: addressController,
+            style: const TextStyle(
+              fontFamily: AppFonts.sans,
+              color: AppColors.textPrimary,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Tailscale IP',
+              hintStyle: const TextStyle(
+                fontFamily: AppFonts.sans,
+                color: AppColors.textSecondary,
+              ),
+              filled: true,
+              fillColor: AppColors.surfaceHigh,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 16,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _RollPillButton(
+            label: 'Join a Roll',
+            background: AppColors.textPrimary,
+            onPressed: busy ? null : onJoin,
+          ),
+
+          if (error != null) ...[
+            const SizedBox(height: 16),
+            Text(
+              error!,
+              style: const TextStyle(
+                fontFamily: AppFonts.sans,
+                fontSize: 12,
+                color: Colors.redAccent,
+              ),
+            ),
+          ],
+
+          if (recents.isNotEmpty) ...[
+            const SizedBox(height: 32),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Recent',
+                style: TextStyle(
+                  fontFamily: AppFonts.sans,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...recents.map(
+              (recent) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: busy ? null : () => onSelectRecent(recent),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceHigh,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.history,
+                          color: AppColors.textSecondary,
+                          size: 18,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          recent.address,
-                          textAlign: TextAlign.right,
+                        const SizedBox(width: 12),
+                        Text(
+                          recent.username,
                           style: const TextStyle(
                             fontFamily: AppFonts.sans,
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            recent.address,
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              fontFamily: AppFonts.sans,
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -369,13 +426,21 @@ class _StatusBody extends StatelessWidget {
             child: Text(
               statusSubtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontFamily: AppFonts.sans, fontSize: 13, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontFamily: AppFonts.sans,
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           const SizedBox(height: 32),
           SizedBox(
             width: 200,
-            child: _RollPillButton(label: actionLabel, background: AppColors.textPrimary, onPressed: onAction),
+            child: _RollPillButton(
+              label: actionLabel,
+              background: AppColors.textPrimary,
+              onPressed: onAction,
+            ),
           ),
         ],
       ),
