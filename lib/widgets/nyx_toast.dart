@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -77,56 +78,65 @@ class _NyxToastState extends State<NyxToast>
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.accent.withOpacity(0.35),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.45),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+      child: ClipRRect(
+        // Blur whatever's behind the toast (album art, title text, etc.)
+        // instead of relying on a low-opacity fill that lets it bleed
+        // through legibly.
+        borderRadius: BorderRadius.circular(14),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.accent.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.45),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              child: Row(
-                children: [
-                  Icon(widget.icon, color: Colors.white, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      widget.message,
-                      style: const TextStyle(
-                        fontFamily: AppFonts.sans,
-                        fontFamilyFallback: AppFonts.fallback,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  child: Row(
+                    children: [
+                      Icon(widget.icon, color: Colors.white, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          widget.message,
+                          style: const TextStyle(
+                            fontFamily: AppFonts.sans,
+                            fontFamilyFallback: AppFonts.fallback,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+                // The countdown -- shrinks from full width to nothing over
+                // [duration], then the toast dismisses itself.
+                AnimatedBuilder(
+                  animation: _timer,
+                  builder: (context, _) => Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: 1 - _timer.value,
+                      child: Container(height: 3, color: Colors.white),
                     ),
                   ),
-                ],
-              ),
-            ),
-            // The countdown -- shrinks from full width to nothing over
-            // [duration], then the toast dismisses itself.
-            AnimatedBuilder(
-              animation: _timer,
-              builder: (context, _) => Align(
-                alignment: Alignment.centerLeft,
-                child: FractionallySizedBox(
-                  widthFactor: 1 - _timer.value,
-                  child: Container(height: 3, color: Colors.white),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
