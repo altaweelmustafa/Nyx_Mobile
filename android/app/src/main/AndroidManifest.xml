@@ -18,6 +18,11 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- Required on Android 13+ to actually show the playback notification.
+         Without it (and the runtime request in MainActivity) the foreground
+         service still runs but its notification/controls stay invisible, so
+         there's no way to pause or stop playback except force-stopping the app. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="Nyx"
         android:name="${applicationName}"

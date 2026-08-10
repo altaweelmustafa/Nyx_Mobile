@@ -19,6 +19,10 @@ class NyxAudioHandler extends BaseAudioHandler with SeekHandler {
 
   String? _mediaItemTrackId;
   Duration? _mediaItemDuration;
+  bool? _lastPlaying;
+  bool? _lastLoading;
+  DateTime? _lastBroadcastAt;
+  Duration? _lastBroadcastPosition;
 
   NyxAudioHandler(this._service) {
     _service.addListener(_sync);
@@ -27,7 +31,26 @@ class NyxAudioHandler extends BaseAudioHandler with SeekHandler {
 
   void _sync() {
     _maybeUpdateMediaItem();
+    // AudioPlayerService.notifyListeners() fires on every position tick
+    // (several times a second during playback); broadcasting a fresh
+    // PlaybackState that often floods the platform channel and makes the
+    // notification / in-app play-pause button lag. Only push a new one when
+    // playing/loading changes, or the position jumped further than normal
+    // playback would explain (a seek) -- audio_service extrapolates position
+    // between updates from updatePosition + updateTime otherwise, so this
+    // doesn't cost seek-bar accuracy.
+    final stateChanged =
+        _service.isPlaying != _lastPlaying || _service.isLoading != _lastLoading;
+    if (!stateChanged && !_positionJumped()) return;
     _updatePlaybackState();
+  }
+
+  bool _positionJumped() {
+    final at = _lastBroadcastAt;
+    final pos = _lastBroadcastPosition;
+    if (at == null || pos == null || _lastPlaying != true) return false;
+    final expected = pos + DateTime.now().difference(at);
+    return (_service.position - expected).abs() > const Duration(milliseconds: 1200);
   }
 
   Future<void> _maybeUpdateMediaItem() async {
@@ -67,6 +90,10 @@ class NyxAudioHandler extends BaseAudioHandler with SeekHandler {
 
   void _updatePlaybackState() {
     final playing = _service.isPlaying;
+    _lastPlaying = playing;
+    _lastLoading = _service.isLoading;
+    _lastBroadcastAt = DateTime.now();
+    _lastBroadcastPosition = _service.position;
     playbackState.add(
       playbackState.value.copyWith(
         controls: [

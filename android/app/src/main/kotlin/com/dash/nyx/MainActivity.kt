@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothProfile
 import android.content.pm.PackageManager
 import android.content.Context
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.NonNull
@@ -26,11 +27,34 @@ class MainActivity : FlutterActivity() {
     private val channelName = "com.brager/bluetooth"
     private val proxyTimeout = 3000L
     private val requestCodeBluetoothConnect = 4201
+    private val requestCodeNotifications = 4202
 
     // Reuse audio_service's own FlutterEngine so playback started from the
     // media notification / lock screen shares state with the app's UI.
     override fun provideFlutterEngine(@NonNull context: Context): FlutterEngine =
         AudioServicePlugin.getFlutterEngine(context)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        ensureNotificationPermission()
+    }
+
+    /// On Android 13+ (API 33+), posting the playback notification -- the
+    /// only external play/pause/stop control once the app is backgrounded --
+    /// requires this runtime permission. Without it the foreground service
+    /// still plays audio but silently shows no notification at all.
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                requestCodeNotifications,
+            )
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
