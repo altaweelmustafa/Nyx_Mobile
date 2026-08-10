@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../models/playlist.dart';
 import '../models/track.dart';
 import '../repositories/playlist_repository.dart';
 import '../repositories/track_repository.dart';
@@ -10,6 +11,8 @@ import '../services/audio_player_service.dart';
 import '../services/library_service.dart';
 import '../widgets/song_actions.dart';
 import '../widgets/track_thumbnail.dart';
+import 'liked_tracks_screen.dart';
+import 'playlist_screen.dart';
 import 'track_view_screen.dart';
 
 /// One card slot in the Home "Recommended" row -- either a track or an
@@ -38,6 +41,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _trackRepo = TrackRepository();
   final _playlistRepo = PlaylistRepository();
+  List<Playlist> _playlists = [];
+  final Map<String, String?> _playlistThumbnails = {};
+  int _likedCount = 0;
+  String? _likedThumbnail;
   List<Track> _mostPlayed = [];
   List<Track> _recommended = [];
   List<_RecItem> _recommendedDisplay = [];
@@ -68,15 +75,31 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _load() async {
+    final playlistsFuture = _playlistRepo.getLiked();
+    final likedFuture = _trackRepo.getLiked();
     final mostPlayedFuture = _trackRepo.getMostPlayed(10);
     final recommendedFuture = _trackRepo.getRecommendedMix(12);
     final artistsFuture = _trackRepo.getRandomArtists(2);
 
+    final playlists = await playlistsFuture;
+    final liked = await likedFuture;
     final mostPlayed = await mostPlayedFuture;
     final recommended = await recommendedFuture;
     final artists = await artistsFuture;
+    final thumbnails = await Future.wait(
+      playlists.map((p) async {
+        final tracks = await _playlistRepo.getTracks(p.id);
+        return MapEntry(p.id, tracks.isNotEmpty ? tracks.first.thumbnailPath : null);
+      }),
+    );
     if (!mounted) return;
     setState(() {
+      _playlists = playlists;
+      _playlistThumbnails
+        ..clear()
+        ..addEntries(thumbnails);
+      _likedCount = liked.length;
+      _likedThumbnail = liked.isNotEmpty ? liked.first.thumbnailPath : null;
       _mostPlayed = mostPlayed;
       _recommended = recommended;
       _recommendedDisplay = _mixInArtists(recommended, artists);
@@ -110,6 +133,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final tracks = await _trackRepo.getByArtist(artist);
     if (!mounted || tracks.isEmpty) return;
     _play(context, tracks, 0);
+  }
+
+  Future<void> _openPlaylist(Playlist playlist) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => PlaylistScreen(playlist: playlist)),
+    );
+  }
+
+  Future<void> _openLikedTracks() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const LikedTracksScreen()),
+    );
   }
 
   void _showSongOptions(
@@ -157,6 +192,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.only(bottom: 160),
                 children: [
                   const SizedBox(height: 24),
+
+                  // ── Playlists ────────────────────────────────────────────────
+                  _PlaylistRow(
+                    playlists: _playlists,
+                    playlistThumbnails: _playlistThumbnails,
+                    likedCount: _likedCount,
+                    likedThumbnail: _likedThumbnail,
+                    onTap: _openPlaylist,
+                    onTapLikedSongs: _openLikedTracks,
+                  ),
+                  const SizedBox(height: 32),
 
                   // ── Most Played ──────────────────────────────────────────────
                   if (_mostPlayed.isNotEmpty) ...[
@@ -209,6 +255,127 @@ class _SectionHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
+    );
+  }
+}
+
+// ── Playlists: thin, sharp-edged tiles ──────────────────────────────────────
+
+class _PlaylistRow extends StatelessWidget {
+  final List<Playlist> playlists;
+  final Map<String, String?> playlistThumbnails;
+  final int likedCount;
+  final String? likedThumbnail;
+  final void Function(Playlist playlist) onTap;
+  final VoidCallback onTapLikedSongs;
+
+  const _PlaylistRow({
+    required this.playlists,
+    required this.playlistThumbnails,
+    required this.likedCount,
+    required this.likedThumbnail,
+    required this.onTap,
+    required this.onTapLikedSongs,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final itemCount = playlists.length + 1; // +1 for Liked Songs
+
+    return SizedBox(
+      height: 44,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: itemCount,
+        itemBuilder: (context, i) {
+          final child = i == 0
+              ? _PlaylistTile(
+                  name: 'Liked Songs',
+                  subtitle: '$likedCount TRACKS',
+                  thumbnailPath: likedThumbnail,
+                  onTap: onTapLikedSongs,
+                )
+              : _PlaylistTile(
+                  name: playlists[i - 1].name,
+                  subtitle: '${playlists[i - 1].trackCount} TRACKS',
+                  thumbnailPath: playlistThumbnails[playlists[i - 1].id],
+                  onTap: () => onTap(playlists[i - 1]),
+                );
+          return Padding(
+            padding: EdgeInsets.only(right: i < itemCount - 1 ? 12 : 0),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PlaylistTile extends StatelessWidget {
+  final String name;
+  final String subtitle;
+  final String? thumbnailPath;
+  final VoidCallback onTap;
+
+  const _PlaylistTile({
+    required this.name,
+    required this.subtitle,
+    required this.thumbnailPath,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 200,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: const BoxDecoration(
+          color: AppColors.surfaceHigh,
+          borderRadius: BorderRadius.zero,
+        ),
+        child: Row(
+          children: [
+            TrackThumbnail(size: 32, assetPath: thumbnailPath, borderRadius: 0),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: AppFonts.sans,
+                      fontFamilyFallback: AppFonts.fallback,
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: AppFonts.sans,
+                      fontFamilyFallback: AppFonts.fallback,
+                      fontSize: 10,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

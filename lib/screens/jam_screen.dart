@@ -13,11 +13,13 @@ class JamScreen extends StatefulWidget {
 
 class _JamScreenState extends State<JamScreen> {
   final _addressController = TextEditingController();
+  final _usernameController = TextEditingController();
   bool _busy = false;
 
   @override
   void dispose() {
     _addressController.dispose();
+    _usernameController.dispose();
     super.dispose();
   }
 
@@ -31,8 +33,14 @@ class _JamScreenState extends State<JamScreen> {
     final address = _addressController.text.trim();
     if (address.isEmpty) return;
     setState(() => _busy = true);
-    await jam.join(address);
+    await jam.join(address, username: _usernameController.text.trim());
     if (mounted) setState(() => _busy = false);
+  }
+
+  void _selectRecent(JamService jam, RecentRoll recent) {
+    _addressController.text = recent.address;
+    _usernameController.text = recent.username;
+    _join(jam);
   }
 
   @override
@@ -76,10 +84,13 @@ class _JamScreenState extends State<JamScreen> {
       case JamRole.none:
         return _IdleBody(
           addressController: _addressController,
+          usernameController: _usernameController,
+          recents: jam.recents,
           busy: _busy,
           error: jam.error,
           onStartHosting: () => _startHosting(jam),
           onJoin: () => _join(jam),
+          onSelectRecent: (recent) => _selectRecent(jam, recent),
         );
       case JamRole.host:
         return _StatusBody(
@@ -138,17 +149,23 @@ class _RollPillButton extends StatelessWidget {
 
 class _IdleBody extends StatelessWidget {
   final TextEditingController addressController;
+  final TextEditingController usernameController;
+  final List<RecentRoll> recents;
   final bool busy;
   final String? error;
   final VoidCallback onStartHosting;
   final VoidCallback onJoin;
+  final ValueChanged<RecentRoll> onSelectRecent;
 
   const _IdleBody({
     required this.addressController,
+    required this.usernameController,
+    required this.recents,
     required this.busy,
     required this.error,
     required this.onStartHosting,
     required this.onJoin,
+    required this.onSelectRecent,
   });
 
   @override
@@ -205,6 +222,19 @@ class _IdleBody extends StatelessWidget {
 
         // ── Join ────────────────────────────────────────────────────────
         TextField(
+          controller: usernameController,
+          style: const TextStyle(fontFamily: AppFonts.sans, color: AppColors.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'Username',
+            hintStyle: const TextStyle(fontFamily: AppFonts.sans, color: AppColors.textSecondary),
+            filled: true,
+            fillColor: AppColors.surfaceHigh,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
           controller: addressController,
           style: const TextStyle(fontFamily: AppFonts.sans, color: AppColors.textPrimary),
           decoration: InputDecoration(
@@ -226,6 +256,67 @@ class _IdleBody extends StatelessWidget {
         if (error != null) ...[
           const SizedBox(height: 16),
           Text(error!, style: const TextStyle(fontFamily: AppFonts.sans, fontSize: 12, color: Colors.redAccent)),
+        ],
+
+        if (recents.isNotEmpty) ...[
+          const SizedBox(height: 32),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Recent',
+              style: TextStyle(
+                fontFamily: AppFonts.sans,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...recents.map(
+            (recent) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: busy ? null : () => onSelectRecent(recent),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceHigh,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.history, color: AppColors.textSecondary, size: 18),
+                      const SizedBox(width: 12),
+                      Text(
+                        recent.username,
+                        style: const TextStyle(
+                          fontFamily: AppFonts.sans,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          recent.address,
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            fontFamily: AppFonts.sans,
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ],
     );

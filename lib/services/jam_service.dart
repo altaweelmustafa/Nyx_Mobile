@@ -2,24 +2,72 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'audio_player_service.dart';
 
 enum JamRole { none, host, client }
+
+/// A previously joined roll host, kept around for quick rejoin.
+class RecentRoll {
+  final String username;
+  final String address;
+
+  const RecentRoll({required this.username, required this.address});
+
+  Map<String, Object?> toJson() => {'username': username, 'address': address};
+
+  factory RecentRoll.fromJson(Map<String, Object?> json) => RecentRoll(
+        username: json['username'] as String? ?? '',
+        address: json['address'] as String,
+      );
+}
 
 /// Dead simple listen-together over a tailnet: one device hosts a WebSocket
 /// server and pushes its playback state, everyone else just mirrors it.
 /// No bidirectional control, no reconnect logic -- the host DJs.
 class JamService extends ChangeNotifier {
   static const port = 53289;
+  static const _recentsKey = 'jam_recent_rolls';
+  static const _maxRecents = 5;
 
   final AudioPlayerService _player;
-  JamService(this._player);
+  JamService(this._player) {
+    _loadRecents();
+  }
 
   JamRole _role = JamRole.none;
   JamRole get role => _role;
 
   String? _error;
   String? get error => _error;
+
+  List<RecentRoll> _recents = [];
+  List<RecentRoll> get recents => List.unmodifiable(_recents);
+
+  Future<void> _loadRecents() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_recentsKey) ?? [];
+    _recents = raw
+        .map((s) => RecentRoll.fromJson(jsonDecode(s) as Map<String, dynamic>))
+        .toList();
+    notifyListeners();
+  }
+
+  Future<void> _saveRecent(String address, String username) async {
+    if (username.isEmpty) return;
+    final entry = RecentRoll(username: username, address: address);
+    _recents.removeWhere((r) => r.address == address);
+    _recents.insert(0, entry);
+    if (_recents.length > _maxRecents) {
+      _recents = _recents.sublist(0, _maxRecents);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _recentsKey,
+      _recents.map((r) => jsonEncode(r.toJson())).toList(),
+    );
+    notifyListeners();
+  }
 
   // ── Host state ─────────────────────────────────────────────────────────
   HttpServer? _server;
@@ -99,7 +147,7 @@ class JamService extends ChangeNotifier {
     socket.add(jsonEncode(snapshot));
   }
 
-  Future<bool> join(String address) async {
+  Future<bool> join(String address, {String username = ''}) async {
     try {
       final socket = await WebSocket.connect('ws://$address:$port')
           .timeout(const Duration(seconds: 6));
@@ -108,6 +156,7 @@ class JamService extends ChangeNotifier {
       _role = JamRole.client;
       _error = null;
       notifyListeners();
+      unawaited(_saveRecent(address, username.trim()));
 
       socket.listen(
         _onHostMessage,

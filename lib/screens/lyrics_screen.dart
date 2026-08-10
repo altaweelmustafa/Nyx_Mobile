@@ -208,7 +208,7 @@ class _LyricsScreenState extends State<LyricsScreen> {
                                         ? FontWeight.w700
                                         : FontWeight.w400,
                                     color: isActive
-                                        ? AppColors.accent
+                                        ? Colors.white
                                         : AppColors.textPrimary.withOpacity(
                                             0.45,
                                           ),
