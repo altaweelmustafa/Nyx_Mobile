@@ -49,10 +49,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
       onTap: widget.onTap,
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 5),
         decoration: BoxDecoration(
           color: _bgColor ?? AppColors.surfaceHigh,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -60,11 +60,11 @@ class _MiniPlayerState extends State<MiniPlayer> {
             Row(
               children: [
                 TrackThumbnail(
-                  size: 42,
+                  size: 34,
                   assetPath: track.thumbnailPath,
                   borderRadius: 6,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,11 +144,11 @@ class _MiniPlayerState extends State<MiniPlayer> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 5),
             WaveformScrubber(
               progress: svc.progress,
-              height: 28,
-              thumbRadius: 7,
+              height: 20,
+              thumbRadius: 6,
             ),
           ],
         ),

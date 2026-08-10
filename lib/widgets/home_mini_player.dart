@@ -95,16 +95,7 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Nyx logo top-left
-                    Container(
-                      width: 32,
-                      height: 32,
-                      padding: const EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.55),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Image.asset('assets/icons/nyx_logo.png'),
-                    ),
+                    Image.asset('assets/icons/nyx_logo.png', width: 48, height: 48),
 
                     const Spacer(flex: 2),
 

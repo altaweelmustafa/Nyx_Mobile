@@ -254,22 +254,32 @@ class AudioPlayerService extends ChangeNotifier {
 
   Future<void> pause() => _player.pause();
 
+  /// Unconditionally resumes/starts playback of the current track (a no-op
+  /// if nothing is loaded or it's already playing). Used by togglePlayPause
+  /// and by the Android media-notification / lock-screen "play" control.
+  Future<void> resume() async {
+    if (_isPlaying || _currentTrack == null) return;
+    // If we're at the end of the track (completed state), restart from the beginning.
+    if (_player.processingState == ProcessingState.completed) {
+      await _player.seek(Duration.zero);
+    }
+    await _player.play();
+  }
+
   Future<void> togglePlayPause() async {
     if (_isPlaying) {
       await pause();
-    } else if (_currentTrack != null) {
-      // If we're at the end of the track (completed state), restart from the beginning.
-      if (_player.processingState == ProcessingState.completed) {
-        await _player.seek(Duration.zero);
-      }
-      await _player.play();
+    } else {
+      await resume();
     }
   }
+
+  Future<void> seek(Duration position) => _player.seek(position);
 
   Future<void> seekToFraction(double fraction) async {
     if (_duration == Duration.zero) return;
     final ms = (fraction * _duration.inMilliseconds).round();
-    await _player.seek(Duration(milliseconds: ms));
+    await seek(Duration(milliseconds: ms));
   }
 
   void toggleShuffle() {

@@ -6,11 +6,14 @@ import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothProfile
 import android.content.pm.PackageManager
+import android.content.Context
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.NonNull
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.ryanheise.audioservice.AudioServicePlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -23,6 +26,11 @@ class MainActivity : FlutterActivity() {
     private val channelName = "com.brager/bluetooth"
     private val proxyTimeout = 3000L
     private val requestCodeBluetoothConnect = 4201
+
+    // Reuse audio_service's own FlutterEngine so playback started from the
+    // media notification / lock screen shares state with the app's UI.
+    override fun provideFlutterEngine(@NonNull context: Context): FlutterEngine =
+        AudioServicePlugin.getFlutterEngine(context)
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
