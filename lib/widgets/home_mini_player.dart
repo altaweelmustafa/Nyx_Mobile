@@ -45,167 +45,176 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: AppColors.surfaceHigh, // fallback if no art
+          color: AppColors.surfaceHigh,
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: Stack(
-            // No StackFit.expand / fixed height here on purpose -- the card
-            // sizes itself to whatever the content column below actually
-            // needs, so it can never overflow on a shorter screen or a
-            // larger text-scale setting. The art + gradient layers are
-            // Positioned.fill so they don't factor into that sizing.
-            children: [
-              // ── Layer 1: album art as background ────────────────────────────
-              if (track.thumbnailPath case final path?)
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.20,
+            ),
+            child: Stack(
+              children: [
+                if (track.thumbnailPath case final path?)
+                  Positioned.fill(
+                    child:
+                        path.startsWith('http://') ||
+                            path.startsWith('https://')
+                        ? CachedNetworkImage(
+                            imageUrl: path,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) =>
+                                Container(color: AppColors.surfaceHigh),
+                          )
+                        : Image.asset(
+                            path,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                Container(color: AppColors.surfaceHigh),
+                          ),
+                  ),
+
                 Positioned.fill(
-                  child:
-                      path.startsWith('http://') || path.startsWith('https://')
-                      ? CachedNetworkImage(
-                          imageUrl: path,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) =>
-                              Container(color: AppColors.surfaceHigh),
-                        )
-                      : Image.asset(
-                          path,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              Container(color: AppColors.surfaceHigh),
-                        ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          (_tint == null
+                                  ? Colors.black
+                                  : Color.lerp(_tint, Colors.black, 0.35)!)
+                              .withOpacity(0.4),
+                          Colors.black.withOpacity(0.8),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
 
-              // ── Layer 2: color-tinted gradient overlay so text is readable
-              // and the wash matches the art, Spotify-style ────────────────
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        (_tint == null
-                                ? Colors.black
-                                : Color.lerp(_tint, Colors.black, 0.35)!)
-                            .withOpacity(0.4),
-                        Colors.black.withOpacity(0.8),
+                // Content now fills the card's full (fixed) height and
+                // spaces its two groups apart, instead of being wrapped
+                // in a scroll view that let it collapse to the top and
+                // leave dead space below.
+                Positioned.fill(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Top group: identity ──────────────────────
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Image.asset(
+                                  'assets/icons/nyx_logo.png',
+                                  width: 22,
+                                  height: 22,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    track.title,
+                                    style: const TextStyle(
+                                      fontFamily: AppFonts.sans,
+                                      fontFamilyFallback: AppFonts.fallback,
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              track.artist,
+                              style: TextStyle(
+                                fontFamily: AppFonts.mono,
+                                fontFamilyFallback: AppFonts.fallback,
+                                fontSize: 12,
+                                color: Colors.white.withOpacity(0.7),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 5),
+                            const BluetoothIndicator(
+                              iconSize: 12,
+                              fontSize: 11,
+                              nameWidth: 200,
+                            ),
+                          ],
+                        ),
+
+                        // ── Bottom group: controls ────────────────────
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _Btn(
+                                  icon: Icons.shuffle,
+                                  size: 18,
+                                  color: svc.isShuffle
+                                      ? AppColors.accent
+                                      : Colors.white,
+                                  onTap: svc.toggleShuffle,
+                                ),
+                                _Btn(
+                                  icon: Icons.skip_previous,
+                                  size: 23,
+                                  color: Colors.white,
+                                  onTap: svc.playPrevious,
+                                ),
+                                _Btn(
+                                  icon: svc.isPlaying
+                                      ? Icons.pause
+                                      : Icons.play_arrow,
+                                  size: 28,
+                                  color: Colors.white,
+                                  onTap: svc.togglePlayPause,
+                                ),
+                                _Btn(
+                                  icon: Icons.skip_next,
+                                  size: 23,
+                                  color: Colors.white,
+                                  onTap: svc.playNext,
+                                ),
+                                LoopModeButton(
+                                  loopMode: svc.loopMode,
+                                  onTap: svc.toggleRepeat,
+                                  size: 18,
+                                  inactiveColor: Colors.white,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            WaveformScrubber(
+                              progress: svc.progress,
+                              height: 20,
+                              activeColor: Colors.white,
+                              passiveColor: Colors.white.withOpacity(0.22),
+                              thumbColor: Colors.white,
+                              thumbRadius: 7,
+                              onChanged: (v) => svc.seekToFraction(v),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
-
-              // ── Layer 3: content ────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Nyx logo top-left
-                    Image.asset(
-                      'assets/icons/nyx_logo.png',
-                      width: 48,
-                      height: 48,
-                    ),
-
-                    const SizedBox(height: 40),
-
-                    // Title
-                    Text(
-                      track.title,
-                      style: const TextStyle(
-                        fontFamily: AppFonts.sans,
-                        fontFamilyFallback: AppFonts.fallback,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-
-                    const SizedBox(height: 2),
-
-                    // Artist
-                    Text(
-                      track.artist,
-                      style: TextStyle(
-                        fontFamily: AppFonts.mono,
-                        fontFamilyFallback: AppFonts.fallback,
-                        fontSize: 12,
-                        color: Colors.white.withOpacity(0.7),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    // Bluetooth row
-                    const BluetoothIndicator(
-                      iconSize: 12,
-                      fontSize: 11,
-                      nameWidth: 220,
-                    ),
-
-                    const SizedBox(height: 6),
-
-                    // Transport controls
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        _Btn(
-                          icon: Icons.shuffle,
-                          size: 20,
-                          color: svc.isShuffle
-                              ? AppColors.accent
-                              : Colors.white,
-                          onTap: svc.toggleShuffle,
-                        ),
-                        _Btn(
-                          icon: Icons.skip_previous,
-                          size: 26,
-                          color: Colors.white,
-                          onTap: svc.playPrevious,
-                        ),
-                        _Btn(
-                          icon: svc.isPlaying ? Icons.pause : Icons.play_arrow,
-                          size: 30,
-                          color: Colors.white,
-                          onTap: svc.togglePlayPause,
-                        ),
-                        _Btn(
-                          icon: Icons.skip_next,
-                          size: 26,
-                          color: Colors.white,
-                          onTap: svc.playNext,
-                        ),
-                        LoopModeButton(
-                          loopMode: svc.loopMode,
-                          onTap: svc.toggleRepeat,
-                          size: 20,
-                          inactiveColor: Colors.white,
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Waveform — white active on top of blurred art looks great
-                    WaveformScrubber(
-                      progress: svc.progress,
-                      height: 24,
-                      activeColor: Colors.white,
-                      passiveColor: Colors.white.withOpacity(0.22),
-                      thumbColor: Colors.white,
-                      thumbRadius: 8,
-                      onChanged: (v) => svc.seekToFraction(v),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
