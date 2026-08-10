@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
-import '../models/playlist.dart';
 import '../models/track.dart';
 import '../repositories/playlist_repository.dart';
 import '../repositories/track_repository.dart';
+import '../services/artwork_color_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/jam_service.dart';
 import '../widgets/bluetooth_indicator.dart';
 import '../widgets/loop_mode_button.dart';
 import '../services/waveform_service.dart';
+import '../widgets/nyx_toast.dart';
 import '../widgets/options_sheet.dart';
+import '../widgets/song_actions.dart';
 import '../widgets/track_thumbnail.dart';
 import '../widgets/waveform_scrubber.dart';
 import 'lyrics_screen.dart';
@@ -33,6 +35,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
   List<double>? _waveformBars;
   String? _loadedTrackId;
   AudioPlayerService? _svc;
+  Color? _bgColor;
 
   @override
   void initState() {
@@ -67,6 +70,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
     if (track.id == _loadedTrackId) return;
     _loadedTrackId = track.id;
     _loadWaveform(track);
+    _loadBackgroundColor(track);
   }
 
   Future<void> _loadWaveform(Track track) async {
@@ -76,6 +80,16 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
         : null;
     final bars = await WaveformService.extract(assetPath);
     if (mounted) setState(() => _waveformBars = bars);
+  }
+
+  Future<void> _loadBackgroundColor(Track track) async {
+    final color = await ArtworkColorService.extract(track.thumbnailPath);
+    if (!mounted || track.id != _loadedTrackId) return;
+    setState(
+      () => _bgColor = color == null
+          ? null
+          : ArtworkColorService.tuneForBackground(color),
+    );
   }
 
   @override
@@ -90,71 +104,8 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
     );
   }
 
-  Future<void> _addToPlaylist(Track track) async {
-    final playlists = await _playlistRepo.getAll();
-    if (!mounted) return;
-
-    final selected = await showModalBottomSheet<Playlist>(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: Text(
-                'Add to Playlist',
-                style: TextStyle(
-                  fontFamily: AppFonts.sans,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ),
-            if (playlists.isEmpty)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(20, 4, 20, 24),
-                child: Text(
-                  'No playlists yet.',
-                  style: TextStyle(
-                    fontFamily: AppFonts.sans,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              )
-            else
-              ...playlists.map(
-                (p) => ListTile(
-                  leading: const Icon(Icons.queue_music, color: AppColors.textSecondary),
-                  title: Text(
-                    p.name,
-                    style: const TextStyle(
-                      fontFamily: AppFonts.sans,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  onTap: () => Navigator.of(sheetContext).pop(p),
-                ),
-              ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
-    );
-
-    if (selected == null || !mounted) return;
-    await _playlistRepo.addTrack(selected.id, track.id);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Added to '${selected.name}'")),
-    );
-  }
+  Future<void> _addToPlaylist(Track track) =>
+      addTrackToPlaylist(context, track, _playlistRepo);
 
   void _showTrackOptions(Track track) {
     showOptionsSheet(
@@ -186,7 +137,10 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('Remove from Library?', style: TextStyle(color: AppColors.textPrimary)),
+        title: const Text(
+          'Remove from Library?',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
         content: Text(
           '"${track.title}" will be permanently deleted.',
           style: const TextStyle(color: AppColors.textSecondary),
@@ -198,7 +152,10 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Remove', style: TextStyle(color: Colors.redAccent)),
+            child: const Text(
+              'Remove',
+              style: TextStyle(color: Colors.redAccent),
+            ),
           ),
         ],
       ),
@@ -207,6 +164,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
     if (confirmed != true || !mounted) return;
     await _trackRepo.deleteTrack(track.id);
     if (!mounted) return;
+    NyxToast.show(context, 'Removed from Library', icon: Icons.delete_outline);
     Navigator.of(context).pop();
   }
 
@@ -219,307 +177,333 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ── Top bar ──────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.close,
-                      color: AppColors.textPrimary,
-                      size: 24,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      track.title,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontFamily: AppFonts.sans,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_bgColor ?? AppColors.background, AppColors.background],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // ── Top bar ──────────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.close,
                         color: AppColors.textPrimary,
+                        size: 24,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => _showTrackOptions(track),
-                    icon: const Icon(
-                      Icons.more_vert,
-                      color: AppColors.textPrimary,
-                      size: 24,
+                    Expanded(
+                      child: Text(
+                        track.title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: AppFonts.sans,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Album art ────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: TrackThumbnail(
-                  size: double.infinity,
-                  assetPath: track.thumbnailPath,
-                  borderRadius: 12,
+                    IconButton(
+                      onPressed: () => _showTrackOptions(track),
+                      icon: const Icon(
+                        Icons.more_vert,
+                        color: AppColors.textPrimary,
+                        size: 24,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
 
-            const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
-            // ── Track info + like ────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          track.title,
-                          style: const TextStyle(
-                            fontFamily: AppFonts.sans,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+              // ── Album art ────────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: TrackThumbnail(
+                    size: double.infinity,
+                    assetPath: track.thumbnailPath,
+                    borderRadius: 12,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              // ── Track info + like ────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            track.title,
+                            style: const TextStyle(
+                              fontFamily: AppFonts.sans,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            track.artist,
+                            style: const TextStyle(
+                              fontFamily: AppFonts.sans,
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        final liked = !_liked;
+                        setState(() => _liked = liked);
+                        _trackRepo.setLiked(track.id, liked);
+                        NyxToast.show(
+                          context,
+                          liked ? 'Added to Liked Songs' : 'Removed from Liked Songs',
+                          icon: liked ? Icons.favorite : Icons.favorite_border,
+                        );
+                      },
+                      child: Icon(
+                        _liked ? Icons.favorite : Icons.favorite_border,
+                        color: _liked
+                            ? AppColors.accent
+                            : AppColors.textSecondary,
+                        size: 26,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── Waveform scrubber ────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: svc.isLoading
+                    ? const SizedBox(
+                        height: 48,
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: AppColors.accent,
+                              strokeWidth: 2,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          track.artist,
-                          style: const TextStyle(
-                            fontFamily: AppFonts.sans,
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
+                      )
+                    : WaveformScrubber(
+                        progress: progress,
+                        height: 48,
+                        bars: _waveformBars,
+                        onChanged: following
+                            ? null
+                            : (v) => setState(() => _dragProgress = v),
+                        onChangeEnd: following
+                            ? null
+                            : (v) {
+                                setState(() => _dragProgress = null);
+                                svc.seekToFraction(v);
+                              },
+                      ),
+              ),
+
+              if (following) ...[
+                const SizedBox(height: 6),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 28),
+                  child: Text(
+                    'Host is in control during a Roll',
+                    style: TextStyle(
+                      fontFamily: AppFonts.sans,
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 6),
+
+              // ── Timestamps ───────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      svc.positionLabel,
+                      style: const TextStyle(
+                        fontFamily: AppFonts.mono,
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    Text(
+                      svc.durationLabel,
+                      style: const TextStyle(
+                        fontFamily: AppFonts.mono,
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── Transport controls ───────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Opacity(
+                  opacity: following ? 0.4 : 1.0,
+                  child: IgnorePointer(
+                    ignoring: following,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GestureDetector(
+                          onTap: svc.toggleShuffle,
+                          child: Icon(
+                            Icons.shuffle,
+                            color: svc.isShuffle
+                                ? AppColors.accent
+                                : AppColors.textPrimary,
+                            size: 24,
                           ),
+                        ),
+                        GestureDetector(
+                          onTap: svc.playPrevious,
+                          child: const Icon(
+                            Icons.skip_previous,
+                            color: AppColors.textPrimary,
+                            size: 36,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: svc.togglePlayPause,
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: const BoxDecoration(
+                              color: AppColors.textPrimary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: svc.isLoading
+                                ? const Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: CircularProgressIndicator(
+                                      color: AppColors.background,
+                                      strokeWidth: 2.5,
+                                    ),
+                                  )
+                                : Icon(
+                                    svc.isPlaying
+                                        ? Icons.pause
+                                        : Icons.play_arrow,
+                                    color: AppColors.background,
+                                    size: 32,
+                                  ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: svc.playNext,
+                          child: const Icon(
+                            Icons.skip_next,
+                            color: AppColors.textPrimary,
+                            size: 36,
+                          ),
+                        ),
+                        LoopModeButton(
+                          loopMode: svc.loopMode,
+                          onTap: svc.toggleRepeat,
+                          size: 24,
                         ),
                       ],
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      final liked = !_liked;
-                      setState(() => _liked = liked);
-                      _trackRepo.setLiked(track.id, liked);
-                    },
-                    child: Icon(
-                      _liked ? Icons.favorite : Icons.favorite_border,
-                      color: _liked
-                          ? AppColors.accent
-                          : AppColors.textSecondary,
-                      size: 26,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 24),
+              const SizedBox(height: 28),
 
-            // ── Waveform scrubber ────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: svc.isLoading
-                  ? const SizedBox(
-                      height: 48,
-                      child: Center(
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: AppColors.accent,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                      ),
-                    )
-                  : WaveformScrubber(
-                      progress: progress,
-                      height: 48,
-                      bars: _waveformBars,
-                      onChanged: following ? null : (v) => setState(() => _dragProgress = v),
-                      onChangeEnd: following
-                          ? null
-                          : (v) {
-                              setState(() => _dragProgress = null);
-                              svc.seekToFraction(v);
-                            },
-                    ),
-            ),
-
-            if (following) ...[
-              const SizedBox(height: 6),
+              // ── Bluetooth ────────────────────────────────────────────────────
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 28),
-                child: Text(
-                  'Host is in control during a Roll',
-                  style: TextStyle(fontFamily: AppFonts.sans, fontSize: 11, color: AppColors.textSecondary),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: BluetoothIndicator(
+                    iconSize: 14,
+                    fontSize: 12,
+                    nameWidth: 200,
+                  ),
                 ),
               ),
+
+              const SizedBox(height: 20),
+
+              // ── Bottom actions ───────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _ActionButton(
+                      icon: Icons.playlist_add,
+                      label: 'Playlist',
+                      onTap: () => _addToPlaylist(track),
+                    ),
+                    _ActionButton(
+                      icon: Icons.lyrics_outlined,
+                      label: 'Lyrics',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => LyricsScreen(track: widget.track),
+                        ),
+                      ),
+                    ),
+                    _ActionButton(
+                      icon: Icons.share_outlined,
+                      label: 'Share',
+                      onTap: () => _share(track),
+                    ),
+                    _ActionButton(
+                      icon: Icons.more_horiz,
+                      label: 'More',
+                      onTap: () => _showTrackOptions(track),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Spacer(),
             ],
-
-            const SizedBox(height: 6),
-
-            // ── Timestamps ───────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    svc.positionLabel,
-                    style: const TextStyle(
-                      fontFamily: AppFonts.mono,
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  Text(
-                    svc.durationLabel,
-                    style: const TextStyle(
-                      fontFamily: AppFonts.mono,
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Transport controls ───────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Opacity(
-                opacity: following ? 0.4 : 1.0,
-                child: IgnorePointer(
-                  ignoring: following,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      GestureDetector(
-                        onTap: svc.toggleShuffle,
-                        child: Icon(
-                          Icons.shuffle,
-                          color: svc.isShuffle
-                              ? AppColors.accent
-                              : AppColors.textPrimary,
-                          size: 24,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: svc.playPrevious,
-                        child: const Icon(
-                          Icons.skip_previous,
-                          color: AppColors.textPrimary,
-                          size: 36,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: svc.togglePlayPause,
-                        child: Container(
-                          width: 60,
-                          height: 60,
-                          decoration: const BoxDecoration(
-                            color: AppColors.textPrimary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: svc.isLoading
-                              ? const Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: CircularProgressIndicator(
-                                    color: AppColors.background,
-                                    strokeWidth: 2.5,
-                                  ),
-                                )
-                              : Icon(
-                                  svc.isPlaying ? Icons.pause : Icons.play_arrow,
-                                  color: AppColors.background,
-                                  size: 32,
-                                ),
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: svc.playNext,
-                        child: const Icon(
-                          Icons.skip_next,
-                          color: AppColors.textPrimary,
-                          size: 36,
-                        ),
-                      ),
-                      LoopModeButton(loopMode: svc.loopMode, onTap: svc.toggleRepeat, size: 24),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 28),
-
-            // ── Bluetooth ────────────────────────────────────────────────────
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 28),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: BluetoothIndicator(
-                  iconSize: 14,
-                  fontSize: 12,
-                  nameWidth: 200,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── Bottom actions ───────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _ActionButton(
-                    icon: Icons.playlist_add,
-                    label: 'Playlist',
-                    onTap: () => _addToPlaylist(track),
-                  ),
-                  _ActionButton(
-                    icon: Icons.lyrics_outlined,
-                    label: 'Lyrics',
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => LyricsScreen(track: widget.track),
-                      ),
-                    ),
-                  ),
-                  _ActionButton(
-                    icon: Icons.share_outlined,
-                    label: 'Share',
-                    onTap: () => _share(track),
-                  ),
-                  _ActionButton(
-                    icon: Icons.more_horiz,
-                    label: 'More',
-                    onTap: () => _showTrackOptions(track),
-                  ),
-                ],
-              ),
-            ),
-
-            const Spacer(),
-          ],
+          ),
         ),
       ),
     );

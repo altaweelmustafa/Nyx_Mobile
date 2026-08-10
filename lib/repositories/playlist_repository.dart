@@ -1,6 +1,7 @@
 import '../db/app_database.dart';
 import '../models/playlist.dart';
 import '../models/track.dart';
+import '../services/library_service.dart';
 
 class PlaylistRepository {
   Future<List<Playlist>> _query(String where) async {
@@ -29,6 +30,7 @@ class PlaylistRepository {
       where: 'id = ?',
       whereArgs: [int.parse(playlistId)],
     );
+    LibraryService.instance.notifyChanged();
   }
 
   Future<List<Track>> getTracks(String playlistId) async {
@@ -54,6 +56,7 @@ class PlaylistRepository {
       'liked': 1,
       'created_at': DateTime.now().millisecondsSinceEpoch,
     });
+    LibraryService.instance.notifyChanged();
     return id.toString();
   }
 
@@ -65,11 +68,13 @@ class PlaylistRepository {
       where: 'id = ?',
       whereArgs: [int.parse(playlistId)],
     );
+    LibraryService.instance.notifyChanged();
   }
 
   Future<void> delete(String playlistId) async {
     final db = await AppDatabase.instance.database;
     await db.delete('playlists', where: 'id = ?', whereArgs: [int.parse(playlistId)]);
+    LibraryService.instance.notifyChanged();
   }
 
   Future<void> addTrack(String playlistId, String trackId) async {
@@ -84,5 +89,16 @@ class PlaylistRepository {
       'track_id': int.parse(trackId),
       'position': nextPosition,
     });
+    LibraryService.instance.notifyChanged();
+  }
+
+  Future<void> removeTrack(String playlistId, String trackId) async {
+    final db = await AppDatabase.instance.database;
+    await db.delete(
+      'playlist_tracks',
+      where: 'playlist_id = ? AND track_id = ?',
+      whereArgs: [int.parse(playlistId), int.parse(trackId)],
+    );
+    LibraryService.instance.notifyChanged();
   }
 }

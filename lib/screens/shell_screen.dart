@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../repositories/profile_repository.dart';
 import '../theme/app_theme.dart';
 import '../services/audio_player_service.dart';
+import '../services/catalog_sync_service.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/home_mini_player.dart';
 import 'home_screen.dart';
@@ -21,6 +23,27 @@ class _ShellScreenState extends State<ShellScreen> {
   int _currentIndex = 0;
 
   final _screens = const [HomeScreen(), LibraryScreen(), SearchScreen()];
+
+  @override
+  void initState() {
+    super.initState();
+    _autoSync();
+  }
+
+  /// Fires once whenever the app is opened (ShellScreen is the main app
+  /// shell, mounted right after the login/start screen). Best-effort and
+  /// silent -- if the server isn't reachable (e.g. off the tailnet), it
+  /// just fails quietly exactly like it would if you never synced at all.
+  /// Manual "Sync Now" in Settings still shows its own errors.
+  Future<void> _autoSync() async {
+    try {
+      final url = await ProfileRepository().getServerUrl();
+      await CatalogSyncService().syncFromServer(url);
+    } catch (_) {
+      // Silent -- LibraryService only fires on a successful sync with
+      // actual changes, so nothing to reconcile here either.
+    }
+  }
 
   void _openPlayer() {
     final track = context.read<AudioPlayerService>().currentTrack;

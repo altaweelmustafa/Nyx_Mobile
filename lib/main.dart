@@ -7,9 +7,9 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'theme/app_theme.dart';
 import 'screens/start_screen.dart';
 import 'services/audio_player_service.dart';
-import 'services/auth_service.dart';
 import 'services/bluetooth_route_service.dart';
 import 'services/jam_service.dart';
+import 'services/library_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,8 +46,8 @@ void main() {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AudioPlayerService()),
-        ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProvider(create: (_) => BluetoothRouteService()),
+        ChangeNotifierProvider.value(value: LibraryService.instance),
         // AudioPlayerService() always returns the same singleton instance,
         // so JamService binds to the real shared player here.
         ChangeNotifierProvider(create: (_) => JamService(AudioPlayerService())),
@@ -63,7 +63,7 @@ class BragerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Brager',
+      title: 'Nyx',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       home: const StartScreen(),

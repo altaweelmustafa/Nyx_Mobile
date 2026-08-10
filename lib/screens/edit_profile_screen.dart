@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import '../theme/app_theme.dart';
 import '../repositories/profile_repository.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/nyx_toast.dart';
 import '../widgets/options_sheet.dart';
 import '../widgets/thumbnail.dart';
 
@@ -53,6 +54,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _saving = true);
     await _repo.setDisplayName(name);
     if (!mounted) return;
+    NyxToast.show(context, 'Profile updated', icon: Icons.check_circle_outline);
     Navigator.of(context).pop();
   }
 
@@ -89,6 +91,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _avatarPath = savedPath;
       _pickingAvatar = false;
     });
+    NyxToast.show(context, 'Profile photo updated', icon: Icons.check_circle_outline);
   }
 
   @override

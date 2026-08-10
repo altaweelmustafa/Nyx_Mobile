@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Radio streaming, homelab-hosted track data, and Jam's WebSocket
-         host/client both need real network access in release builds too --
+         host/client both need real network access in release builds too;
          the debug/profile manifests grant this automatically but release
          does not. -->
     <uses-permission android:name="android.permission.INTERNET"/>
@@ -13,7 +13,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <application
-        android:label="brager"
+        android:label="Nyx"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

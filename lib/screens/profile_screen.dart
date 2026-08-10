@@ -4,14 +4,15 @@ import '../theme/app_theme.dart';
 import '../models/playlist.dart';
 import '../repositories/playlist_repository.dart';
 import '../repositories/profile_repository.dart';
-import '../services/auth_service.dart';
+import '../services/library_service.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/nyx_toast.dart';
 import '../widgets/thumbnail.dart';
 import '../widgets/track_thumbnail.dart';
 import 'edit_profile_screen.dart';
 import 'jam_screen.dart';
 import 'playlist_screen.dart';
-import 'start_screen.dart';
+import 'settings_screen.dart';
 import 'sync_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -28,11 +29,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final Map<String, String?> _playlistThumbnails = {};
   String _displayName = '';
   String? _avatarPath;
+  LibraryService? _libSvc;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _libSvc?.removeListener(_load);
+    _libSvc = context.read<LibraryService>();
+    _libSvc!.addListener(_load);
+  }
+
+  @override
+  void dispose() {
+    _libSvc?.removeListener(_load);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -42,7 +58,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final thumbnails = await Future.wait(
       playlists.map((p) async {
         final tracks = await _playlistRepo.getTracks(p.id);
-        return MapEntry(p.id, tracks.isNotEmpty ? tracks.first.thumbnailPath : null);
+        return MapEntry(
+          p.id,
+          tracks.isNotEmpty ? tracks.first.thumbnailPath : null,
+        );
       }),
     );
     if (!mounted) return;
@@ -64,41 +83,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final i = _playlists.indexWhere((p) => p.id == playlist.id);
       if (i != -1) _playlists[i] = playlist.copyWith(liked: liked);
     });
+    NyxToast.show(
+      context,
+      liked ? 'Added to Your Library' : 'Removed from Your Library',
+      icon: liked ? Icons.favorite : Icons.favorite_border,
+    );
   }
 
   Future<void> _openEditProfile() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const EditProfileScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const EditProfileScreen()));
     _load();
-  }
-
-  Future<void> _logout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('Log out?', style: TextStyle(color: AppColors.textPrimary)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Log out', style: TextStyle(color: Colors.redAccent)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-    await context.read<AuthService>().signOut();
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const StartScreen()),
-      (route) => false,
-    );
   }
 
   @override
@@ -148,10 +144,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Log out',
-                    onPressed: _logout,
+                    tooltip: 'Settings',
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    ),
                     icon: const Icon(
-                      Icons.logout,
+                      Icons.settings_outlined,
                       color: AppColors.textPrimary,
                       size: 22,
                     ),
@@ -176,35 +174,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
-              ),
-            ),
-
-            const SizedBox(height: 6),
-
-            // ── Google account link state ───────────────────────────────────
-            Center(
-              child: Consumer<AuthService>(
-                builder: (context, auth, _) => auth.isSignedIn
-                    ? Text(
-                        auth.email!,
-                        style: const TextStyle(
-                          fontFamily: AppFonts.sans,
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      )
-                    : GestureDetector(
-                        onTap: auth.isLoading ? null : () => auth.signIn().then((_) => _load()),
-                        child: Text(
-                          auth.isLoading ? 'Linking…' : 'Link Google account',
-                          style: const TextStyle(
-                            fontFamily: AppFonts.sans,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.accent,
-                          ),
-                        ),
-                      ),
               ),
             ),
 
@@ -235,7 +204,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             // ── Stats row ─────────────────────────────────────────────────────
             Center(
-              child: _StatColumn(value: '${_playlists.length}', label: 'PLAYLISTS'),
+              child: _StatColumn(
+                value: '${_playlists.length}',
+                label: 'PLAYLISTS',
+              ),
             ),
 
             const SizedBox(height: 36),
@@ -304,8 +276,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       GestureDetector(
                         onTap: () => _toggleLiked(playlist),
                         child: Icon(
-                          playlist.liked ? Icons.favorite : Icons.favorite_border,
-                          color: playlist.liked ? AppColors.accent : AppColors.textSecondary,
+                          playlist.liked
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: playlist.liked
+                              ? AppColors.accent
+                              : AppColors.textSecondary,
                           size: 20,
                         ),
                       ),

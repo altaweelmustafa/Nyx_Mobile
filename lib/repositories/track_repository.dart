@@ -1,11 +1,17 @@
 import 'package:sqflite/sqflite.dart';
 import '../db/app_database.dart';
 import '../models/track.dart';
+import '../services/library_service.dart';
 
 class TrackRepository {
   Future<List<Track>> _query(String where, [List<Object?>? args]) async {
     final db = await AppDatabase.instance.database;
-    final rows = await db.query('tracks', where: where, whereArgs: args, orderBy: 'id');
+    final rows = await db.query(
+      'tracks',
+      where: where,
+      whereArgs: args,
+      orderBy: 'id',
+    );
     return rows.map(Track.fromMap).toList();
   }
 
@@ -60,9 +66,90 @@ class TrackRepository {
     return rows.map(Track.fromMap).toList();
   }
 
+  /// Most recently played tracks, newest first.
+  Future<List<Track>> getRecentlyPlayed(int limit) async {
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query(
+      'tracks',
+      where: "song != 'RADIO' AND last_played_at IS NOT NULL",
+      orderBy: 'last_played_at DESC',
+      limit: limit,
+    );
+    return rows.map(Track.fromMap).toList();
+  }
+
+  /// Most recently added tracks -- "new releases" in the absence of a real
+  /// release-date field.
+  Future<List<Track>> getNewReleases(int limit) async {
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query(
+      'tracks',
+      where: "song != 'RADIO'",
+      orderBy: 'created_at DESC',
+      limit: limit,
+    );
+    return rows.map(Track.fromMap).toList();
+  }
+
+  /// Home screen's single "Recommended" shelf: recent plays, then
+  /// artist-based picks, then new releases, deduped by id and capped at
+  /// [limit]. Not a real recommender -- just enough variety to fill a row.
+  Future<List<Track>> getRecommendedMix(int limit) async {
+    final perSource = (limit / 2).ceil();
+    final sources = await Future.wait([
+      getRecentlyPlayed(perSource),
+      getRecommended(perSource),
+      getNewReleases(perSource),
+    ]);
+
+    final seen = <String>{};
+    final mixed = <Track>[];
+    for (final source in sources) {
+      for (final track in source) {
+        if (seen.add(track.id)) mixed.add(track);
+        if (mixed.length == limit) return mixed;
+      }
+    }
+    return mixed;
+  }
+
+  /// All tracks by [artist], for "play this artist" from an artist card.
+  Future<List<Track>> getByArtist(String artist) =>
+      _query("song != 'RADIO' AND artist = ?", [artist]);
+
+  /// A random sample of distinct artists in the library, each paired with
+  /// one of their track thumbnails to stand in for an artist photo (there's
+  /// no dedicated artist-image data). Used to sprinkle artist cards into the
+  /// Home "Recommended" row.
+  Future<List<({String name, String? thumbnailPath})>> getRandomArtists(
+    int count,
+  ) async {
+    final db = await AppDatabase.instance.database;
+    final rows = await db.rawQuery(
+      '''
+      SELECT artist, thumbnail_path FROM tracks
+      WHERE song != 'RADIO'
+      GROUP BY artist
+      ORDER BY RANDOM()
+      LIMIT ?
+      ''',
+      [count],
+    );
+    return rows
+        .map(
+          (r) => (
+            name: r['artist'] as String,
+            thumbnailPath: r['thumbnail_path'] as String?,
+          ),
+        )
+        .toList();
+  }
+
   Future<int> countLiked() async {
     final db = await AppDatabase.instance.database;
-    final result = await db.rawQuery('SELECT COUNT(*) AS c FROM tracks WHERE liked = 1');
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) AS c FROM tracks WHERE liked = 1',
+    );
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
@@ -74,6 +161,7 @@ class TrackRepository {
   Future<void> deleteTrack(String id) async {
     final db = await AppDatabase.instance.database;
     await db.delete('tracks', where: 'id = ?', whereArgs: [int.parse(id)]);
+    LibraryService.instance.notifyChanged();
   }
 
   Future<void> setLiked(String id, bool liked) async {
@@ -87,6 +175,7 @@ class TrackRepository {
       where: 'id = ?',
       whereArgs: [int.parse(id)],
     );
+    LibraryService.instance.notifyChanged();
   }
 
   Future<void> incrementPlayCount(String id) async {
@@ -97,12 +186,19 @@ class TrackRepository {
       'UPDATE tracks SET play_count = play_count + 1, last_played_at = ? WHERE id = ?',
       [DateTime.now().millisecondsSinceEpoch, trackId],
     );
+    LibraryService.instance.notifyChanged();
   }
 
   /// Inserts or updates a track by its server catalog slug. Only the
   /// synced fields (title/artist/audio_url/thumbnail_path/lyrics_path) get
   /// overwritten -- liked/play_count/liked_at are left alone so re-syncing
   /// never resets local state. Returns true if this was a new track.
+  ///
+  /// Deliberately does NOT call LibraryService.notifyChanged() itself --
+  /// CatalogSyncService calls this once per track in a loop, and firing a
+  /// notification per track would spam every listening screen with a
+  /// reload mid-sync. CatalogSyncService notifies once after the whole
+  /// sync (upserts + deleteMissingFromCatalog) finishes instead.
   Future<bool> upsertFromCatalog({
     required String slug,
     required String title,
@@ -113,7 +209,12 @@ class TrackRepository {
     String song = 'SONG',
   }) async {
     final db = await AppDatabase.instance.database;
-    final existing = await db.query('tracks', where: 'slug = ?', whereArgs: [slug], limit: 1);
+    final existing = await db.query(
+      'tracks',
+      where: 'slug = ?',
+      whereArgs: [slug],
+      limit: 1,
+    );
 
     if (existing.isEmpty) {
       await db.insert('tracks', {
@@ -182,6 +283,7 @@ class TrackRepository {
       'liked': 0,
       'created_at': DateTime.now().millisecondsSinceEpoch,
     });
+    LibraryService.instance.notifyChanged();
     return id.toString();
   }
 }

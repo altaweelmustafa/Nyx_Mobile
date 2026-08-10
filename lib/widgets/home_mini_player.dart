@@ -1,26 +1,46 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/artwork_color_service.dart';
 import '../theme/app_theme.dart';
 import '../services/audio_player_service.dart';
 import 'bluetooth_indicator.dart';
 import 'loop_mode_button.dart';
 import 'waveform_scrubber.dart';
 
-class HomeMiniPlayer extends StatelessWidget {
+class HomeMiniPlayer extends StatefulWidget {
   final VoidCallback onTap;
 
   const HomeMiniPlayer({super.key, required this.onTap});
 
   @override
+  State<HomeMiniPlayer> createState() => _HomeMiniPlayerState();
+}
+
+class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
+  String? _loadedPath;
+  Color? _tint;
+
+  void _maybeReloadColor(String? path) {
+    if (path == _loadedPath) return;
+    _loadedPath = path;
+    ArtworkColorService.extract(path).then((color) {
+      if (!mounted || path != _loadedPath) return;
+      setState(() => _tint = color);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final svc   = context.watch<AudioPlayerService>();
+    final svc = context.watch<AudioPlayerService>();
     final track = svc.currentTrack;
 
     if (track == null) return const SizedBox.shrink();
 
+    _maybeReloadColor(track.thumbnailPath);
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
         height: 280,
@@ -33,14 +53,14 @@ class HomeMiniPlayer extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-
               // ── Layer 1: album art as background ────────────────────────────
               if (track.thumbnailPath case final path?)
                 if (path.startsWith('http://') || path.startsWith('https://'))
                   CachedNetworkImage(
                     imageUrl: path,
                     fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => Container(color: AppColors.surfaceHigh),
+                    errorWidget: (_, __, ___) =>
+                        Container(color: AppColors.surfaceHigh),
                   )
                 else
                   Image.asset(
@@ -50,15 +70,19 @@ class HomeMiniPlayer extends StatelessWidget {
                         Container(color: AppColors.surfaceHigh),
                   ),
 
-              // ── Layer 2: dark gradient overlay so text is readable ──────────
+              // ── Layer 2: color-tinted gradient overlay so text is readable
+              // and the wash matches the art, Spotify-style ────────────────
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.35),
-                      Colors.black.withOpacity(0.75),
+                      (_tint == null
+                              ? Colors.black
+                              : Color.lerp(_tint, Colors.black, 0.35)!)
+                          .withOpacity(0.4),
+                      Colors.black.withOpacity(0.8),
                     ],
                   ),
                 ),
@@ -70,26 +94,16 @@ class HomeMiniPlayer extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-
-                    // Brager icon top-left
+                    // Nyx logo top-left
                     Container(
                       width: 32,
                       height: 32,
+                      padding: const EdgeInsets.all(5),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.55),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Center(
-                        child: Text(
-                          'B',
-                          style: TextStyle(
-                            fontFamily: AppFonts.sans,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.accent,
-                          ),
-                        ),
-                      ),
+                      child: Image.asset('assets/icons/nyx_logo.png'),
                     ),
 
                     const Spacer(flex: 2),
@@ -126,7 +140,11 @@ class HomeMiniPlayer extends StatelessWidget {
                     const Spacer(flex: 1),
 
                     // Bluetooth row
-                    const BluetoothIndicator(iconSize: 12, fontSize: 11, nameWidth: 220),
+                    const BluetoothIndicator(
+                      iconSize: 12,
+                      fontSize: 11,
+                      nameWidth: 220,
+                    ),
 
                     const SizedBox(height: 14),
 
@@ -137,7 +155,9 @@ class HomeMiniPlayer extends StatelessWidget {
                         _Btn(
                           icon: Icons.shuffle,
                           size: 20,
-                          color: svc.isShuffle ? AppColors.accent : Colors.white,
+                          color: svc.isShuffle
+                              ? AppColors.accent
+                              : Colors.white,
                           onTap: svc.toggleShuffle,
                         ),
                         _Btn(
@@ -158,7 +178,12 @@ class HomeMiniPlayer extends StatelessWidget {
                           color: Colors.white,
                           onTap: svc.playNext,
                         ),
-                        LoopModeButton(loopMode: svc.loopMode, onTap: svc.toggleRepeat, size: 20, inactiveColor: Colors.white),
+                        LoopModeButton(
+                          loopMode: svc.loopMode,
+                          onTap: svc.toggleRepeat,
+                          size: 20,
+                          inactiveColor: Colors.white,
+                        ),
                       ],
                     ),
 
@@ -200,7 +225,7 @@ class _Btn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Icon(icon, color: color, size: size),
-      );
+    onTap: onTap,
+    child: Icon(icon, color: color, size: size),
+  );
 }

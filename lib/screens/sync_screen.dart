@@ -3,6 +3,7 @@ import '../repositories/profile_repository.dart';
 import '../services/catalog_sync_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/nyx_toast.dart';
 
 class SyncScreen extends StatefulWidget {
   const SyncScreen({super.key});
@@ -63,6 +64,9 @@ class _SyncScreenState extends State<SyncScreen> {
                 '${result.added} new, ${result.updated} updated'
                 '${result.removed > 0 ? ', ${result.removed} removed' : ''}.';
       });
+      if (result.added > 0 || result.updated > 0 || result.removed > 0) {
+        NyxToast.show(context, 'Library synced', icon: Icons.sync);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {

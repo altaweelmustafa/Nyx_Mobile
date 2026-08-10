@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../models/playlist.dart';
 import '../repositories/playlist_repository.dart';
 import '../repositories/track_repository.dart';
+import '../services/library_service.dart';
+import '../widgets/nyx_toast.dart';
 import '../widgets/track_thumbnail.dart';
 import 'liked_tracks_screen.dart';
 import 'playlist_screen.dart';
@@ -22,11 +25,26 @@ class _LibraryScreenState extends State<LibraryScreen> {
   int _likedCount = 0;
   List<Playlist> _playlists = [];
   final Map<String, String?> _playlistThumbnails = {};
+  LibraryService? _libSvc;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _libSvc?.removeListener(_load);
+    _libSvc = context.read<LibraryService>();
+    _libSvc!.addListener(_load);
+  }
+
+  @override
+  void dispose() {
+    _libSvc?.removeListener(_load);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -53,6 +71,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     await _playlistRepo.setLiked(playlist.id, false);
     if (!mounted) return;
     setState(() => _playlists.removeWhere((p) => p.id == playlist.id));
+    NyxToast.show(context, 'Removed from Your Library', icon: Icons.favorite_border);
   }
 
   Future<void> _createPlaylist() async {
@@ -86,6 +105,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final id = await _playlistRepo.create(name);
     await _load();
     if (!mounted) return;
+    NyxToast.show(context, 'Playlist created', icon: Icons.playlist_add);
     final created = _playlists.firstWhere((p) => p.id == id);
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => PlaylistScreen(playlist: created)),

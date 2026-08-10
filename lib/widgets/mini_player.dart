@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/artwork_color_service.dart';
 import '../theme/app_theme.dart';
 import '../services/audio_player_service.dart';
 import 'bluetooth_indicator.dart';
@@ -8,10 +9,31 @@ import 'track_thumbnail.dart';
 import 'waveform_scrubber.dart';
 
 /// Compact mini player shown on Library and Search tabs.
-class MiniPlayer extends StatelessWidget {
+class MiniPlayer extends StatefulWidget {
   final VoidCallback onTap;
 
   const MiniPlayer({super.key, required this.onTap});
+
+  @override
+  State<MiniPlayer> createState() => _MiniPlayerState();
+}
+
+class _MiniPlayerState extends State<MiniPlayer> {
+  String? _loadedPath;
+  Color? _bgColor;
+
+  void _maybeReloadColor(String? path) {
+    if (path == _loadedPath) return;
+    _loadedPath = path;
+    ArtworkColorService.extract(path).then((color) {
+      if (!mounted || path != _loadedPath) return;
+      setState(
+        () => _bgColor = color == null
+            ? null
+            : ArtworkColorService.tuneForBackground(color),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,13 +43,15 @@ class MiniPlayer extends StatelessWidget {
     // Hide if nothing has been played yet
     if (track == null) return const SizedBox.shrink();
 
+    _maybeReloadColor(track.thumbnailPath);
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
         decoration: BoxDecoration(
-          color: AppColors.surfaceHigh,
+          color: _bgColor ?? AppColors.surfaceHigh,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
@@ -35,7 +59,11 @@ class MiniPlayer extends StatelessWidget {
           children: [
             Row(
               children: [
-                TrackThumbnail(size: 42, assetPath: track.thumbnailPath, borderRadius: 6),
+                TrackThumbnail(
+                  size: 42,
+                  assetPath: track.thumbnailPath,
+                  borderRadius: 6,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -54,7 +82,11 @@ class MiniPlayer extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
-                      const BluetoothIndicator(iconSize: 11, fontSize: 11, nameWidth: 100),
+                      const BluetoothIndicator(
+                        iconSize: 11,
+                        fontSize: 11,
+                        nameWidth: 100,
+                      ),
                     ],
                   ),
                 ),
@@ -62,14 +94,20 @@ class MiniPlayer extends StatelessWidget {
                   onTap: svc.toggleShuffle,
                   child: Icon(
                     Icons.shuffle,
-                    color: svc.isShuffle ? AppColors.accent : AppColors.textPrimary,
+                    color: svc.isShuffle
+                        ? AppColors.accent
+                        : AppColors.textPrimary,
                     size: 20,
                   ),
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: svc.playPrevious,
-                  child: const Icon(Icons.skip_previous, color: AppColors.textPrimary, size: 22),
+                  child: const Icon(
+                    Icons.skip_previous,
+                    color: AppColors.textPrimary,
+                    size: 22,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
@@ -92,10 +130,18 @@ class MiniPlayer extends StatelessWidget {
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: svc.playNext,
-                  child: const Icon(Icons.skip_next, color: AppColors.textPrimary, size: 22),
+                  child: const Icon(
+                    Icons.skip_next,
+                    color: AppColors.textPrimary,
+                    size: 22,
+                  ),
                 ),
                 const SizedBox(width: 8),
-                LoopModeButton(loopMode: svc.loopMode, onTap: svc.toggleRepeat, size: 20),
+                LoopModeButton(
+                  loopMode: svc.loopMode,
+                  onTap: svc.toggleRepeat,
+                  size: 20,
+                ),
               ],
             ),
             const SizedBox(height: 8),

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../services/auth_service.dart';
+import '../services/tailnet_service.dart';
 import '../theme/app_theme.dart';
 import 'shell_screen.dart';
 
+/// Entry gate: instead of a credentialed login, this checks whether the
+/// device is on the tailnet (see TailnetService) -- matches the trust model
+/// the rest of the app already uses (Jam, the homelab sync server) since
+/// there's no real backend to authenticate against anyway. Auto-advances
+/// into the app the moment a tailnet IP is found.
 class StartScreen extends StatefulWidget {
   const StartScreen({super.key});
 
@@ -12,33 +16,30 @@ class StartScreen extends StatefulWidget {
 }
 
 class _StartScreenState extends State<StartScreen> {
-  final _emailController    = TextEditingController();
-  final _passwordController = TextEditingController();
-
-  void _navigate() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const ShellScreen()),
-    );
-  }
-
-  Future<void> _continueWithGoogle() async {
-    final auth = context.read<AuthService>();
-    await auth.signIn();
-    if (!mounted) return;
-    if (auth.isSignedIn) {
-      _navigate();
-    } else if (auth.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(auth.error!)),
-      );
-    }
-  }
+  bool _checking = true;
+  bool _connected = false;
 
   @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    setState(() => _checking = true);
+    final connected = await TailnetService.isOnTailnet();
+    if (!mounted) return;
+    setState(() {
+      _checking = false;
+      _connected = connected;
+    });
+    if (connected) _navigate();
+  }
+
+  void _navigate() {
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const ShellScreen()));
   }
 
   @override
@@ -54,23 +55,10 @@ class _StartScreenState extends State<StartScreen> {
 
               // ── Logo ────────────────────────────────────────────────────────
               Container(
-                width: 90,
-                height: 90,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.accent, width: 2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Text(
-                    'B',
-                    style: TextStyle(
-                      fontFamily: AppFonts.sans,
-                      fontSize: 40,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.accent,
-                    ),
-                  ),
-                ),
+                width: 170,
+                height: 170,
+                padding: const EdgeInsets.all(20),
+                child: Image.asset('assets/icons/nyx_logo.png'),
               ),
 
               const SizedBox(height: 32),
@@ -80,9 +68,9 @@ class _StartScreenState extends State<StartScreen> {
                 'Free Music.\nNo Ads.\nFor Everyone.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontFamily: AppFonts.sans,
+                  fontFamily: AppFonts.mono,
                   fontSize: 22,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
                   height: 1.5,
                 ),
@@ -90,164 +78,46 @@ class _StartScreenState extends State<StartScreen> {
 
               const Spacer(),
 
-              // ── Email field ─────────────────────────────────────────────────
-              TextField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                style: const TextStyle(
-                  fontFamily: AppFonts.sans,
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
+              // ── Tailnet gate state ───────────────────────────────────────────
+              if (_checking)
+                const CircularProgressIndicator(color: AppColors.accent)
+              else if (!_connected) ...[
+                const Icon(
+                  Icons.wifi_off,
+                  color: AppColors.textSecondary,
+                  size: 32,
                 ),
-                decoration: InputDecoration(
-                  labelText: 'EMAIL',
-                  labelStyle: const TextStyle(
-                    fontFamily: AppFonts.mono,
-                    fontSize: 11,
-                    letterSpacing: 1.4,
-                    color: AppColors.textSecondary,
-                  ),
-                  floatingLabelBehavior: FloatingLabelBehavior.always,
-                  floatingLabelAlignment: FloatingLabelAlignment.start,
-                  filled: true,
-                  fillColor: AppColors.surfaceHigh,
-                  contentPadding: const EdgeInsets.fromLTRB(14, 20, 14, 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.divider),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.divider),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ── Password field ──────────────────────────────────────────────
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                style: const TextStyle(
-                  fontFamily: AppFonts.sans,
-                  color: AppColors.textPrimary,
-                  fontSize: 14,
-                ),
-                decoration: InputDecoration(
-                  labelText: 'PASSWORD',
-                  labelStyle: const TextStyle(
-                    fontFamily: AppFonts.mono,
-                    fontSize: 11,
-                    letterSpacing: 1.4,
-                    color: AppColors.textSecondary,
-                  ),
-                  floatingLabelBehavior: FloatingLabelBehavior.always,
-                  floatingLabelAlignment: FloatingLabelAlignment.start,
-                  filled: true,
-                  fillColor: AppColors.surfaceHigh,
-                  contentPadding: const EdgeInsets.fromLTRB(14, 20, 14, 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.divider),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.divider),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // ── Log in ──────────────────────────────────────────────────────
-              OutlinedButton(
-                onPressed: _navigate,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.divider),
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  textStyle: const TextStyle(
+                const SizedBox(height: 12),
+                const Text(
+                  'Not connected to the tailnet',
+                  style: TextStyle(
                     fontFamily: AppFonts.sans,
                     fontSize: 15,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-                child: const Text('Log in'),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ── Continue with Google ────────────────────────────────────────
-              Consumer<AuthService>(
-                builder: (context, auth, _) => OutlinedButton(
-                  onPressed: auth.isLoading ? null : _continueWithGoogle,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: AppColors.divider),
-                    minimumSize: const Size(double.infinity, 50),
-                    padding: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Connect to Tailscale, then try again.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: AppFonts.sans,
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
                   ),
-                  child: auth.isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textSecondary),
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Row(
-                            children: [
-                              // Google logo far left
-                              Image.asset(
-                                'assets/icons/google.png',
-                                width: 20,
-                                height: 20,
-                              ),
-                              // Text centered in remaining space
-                              const Expanded(
-                                child: Text(
-                                  'Continue with Google',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontFamily: AppFonts.sans,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              // Invisible balancer so text is truly centered
-                              const SizedBox(width: 20),
-                            ],
-                          ),
-                        ),
                 ),
-              ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: _check,
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(200, 46),
+                  ),
+                  child: const Text('Try Again'),
+                ),
+              ],
 
-              const SizedBox(height: 12),
-
-              // ── Sign up ─────────────────────────────────────────────────────
-              ElevatedButton(
-                onPressed: _navigate,
-                child: const Text('Sign up'),
-              ),
-
-              const SizedBox(height: 40),
+              const SizedBox(height: 60),
             ],
           ),
         ),

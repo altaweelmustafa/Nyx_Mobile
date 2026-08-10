@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../repositories/track_repository.dart';
+import 'library_service.dart';
 
 class SyncResult {
   final int total;
@@ -55,6 +56,12 @@ class CatalogSyncService {
     }
 
     final removed = await _trackRepo.deleteMissingFromCatalog(catalogSlugs);
+
+    // One notification for the whole sync, not per track -- see
+    // upsertFromCatalog's doc comment for why it doesn't notify itself.
+    if (added > 0 || updated > 0 || removed > 0) {
+      LibraryService.instance.notifyChanged();
+    }
 
     return SyncResult(total: tracks.length, added: added, updated: updated, removed: removed);
   }

@@ -3,8 +3,11 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../models/track.dart';
 import '../repositories/track_repository.dart';
+import '../repositories/playlist_repository.dart';
 import '../services/audio_player_service.dart';
+import '../services/library_service.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/song_actions.dart';
 import '../widgets/track_thumbnail.dart';
 import 'track_view_screen.dart';
 
@@ -20,14 +23,30 @@ class LikedTracksScreen extends StatefulWidget {
 
 class _LikedTracksScreenState extends State<LikedTracksScreen> {
   final _trackRepo = TrackRepository();
+  final _playlistRepo = PlaylistRepository();
 
   List<Track> _tracks = [];
   bool _loading = true;
+  LibraryService? _libSvc;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _libSvc?.removeListener(_load);
+    _libSvc = context.read<LibraryService>();
+    _libSvc!.addListener(_load);
+  }
+
+  @override
+  void dispose() {
+    _libSvc?.removeListener(_load);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -44,6 +63,27 @@ class _LikedTracksScreenState extends State<LikedTracksScreen> {
     await _trackRepo.setLiked(track.id, false);
     if (!mounted) return;
     setState(() => _tracks.removeAt(index));
+  }
+
+  void _showSongOptions(int index) {
+    final track = _tracks[index];
+    showSongOptionsSheet(
+      context,
+      track: track,
+      trackRepo: _trackRepo,
+      playlistRepo: _playlistRepo,
+      liked: track.liked,
+      onLikeChanged: (liked) {
+        if (!mounted) return;
+        if (!liked) {
+          setState(() => _tracks.removeAt(index));
+        } else {
+          setState(() => _tracks[index] = track.copyWith(liked: liked));
+        }
+      },
+      removeLabel: 'Remove from Liked',
+      onRemove: () => _unlike(index),
+    );
   }
 
   @override
@@ -141,10 +181,10 @@ class _LikedTracksScreenState extends State<LikedTracksScreen> {
                                       ),
                                     ),
                                     GestureDetector(
-                                      onTap: () => _unlike(i),
+                                      onTap: () => _showSongOptions(i),
                                       child: const Icon(
-                                        Icons.favorite,
-                                        color: AppColors.accent,
+                                        Icons.more_vert,
+                                        color: AppColors.textSecondary,
                                         size: 20,
                                       ),
                                     ),

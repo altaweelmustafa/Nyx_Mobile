@@ -25,6 +25,10 @@ dependencies:
 
   # Network images with caching
   cached_network_image: ^3.3.1
+  flutter_cache_manager: ^3.3.1
+
+  # Dominant color extraction from album art (Spotify-style backgrounds)
+  palette_generator: ^0.3.3
 
   # HTTP client
   dio: ^5.4.3
@@ -50,13 +54,38 @@ dependencies:
   share_plus: ^13.3.0
   image_picker: ^1.2.3
 
-  # Auth
-  google_sign_in: ^6.2.1
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.3
+  flutter_native_splash: ^2.4.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/nyx_logo.png"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/icons/nyx_logo.png"
+    background_color: "#111111"
+    theme_color: "#111111"
+  windows:
+    generate: true
+    image_path: "assets/icons/nyx_logo.png"
+  macos:
+    generate: true
+    image_path: "assets/icons/nyx_logo.png"
+
+flutter_native_splash:
+  color: "#111111"
+  image: "assets/icons/nyx_logo.png"
+  android_12:
+    color: "#111111"
+    image: "assets/icons/nyx_logo.png"
+  web: false
+  fullscreen: true
 
 flutter:
   uses-material-design: true

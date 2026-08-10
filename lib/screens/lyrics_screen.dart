@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../models/track.dart';
+import '../services/artwork_color_service.dart';
 import '../services/lyrics_service.dart';
 import '../services/audio_player_service.dart';
 import '../widgets/app_scaffold.dart';
@@ -24,11 +25,19 @@ class _LyricsScreenState extends State<LyricsScreen> {
   // Key list for scrolling to the active line
   final List<GlobalKey> _keys = [];
   bool _userScrolling = false;
+  Color? _bgColor;
 
   @override
   void initState() {
     super.initState();
     _loadLyrics();
+    _loadBackgroundColor();
+  }
+
+  Future<void> _loadBackgroundColor() async {
+    final color = await ArtworkColorService.extract(widget.track.thumbnailPath);
+    if (!mounted || color == null) return;
+    setState(() => _bgColor = ArtworkColorService.tuneForBackground(color));
   }
 
   Future<void> _loadLyrics() async {
@@ -74,137 +83,150 @@ class _LyricsScreenState extends State<LyricsScreen> {
     }
 
     return AppScaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ── Top bar ──────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new,
-                      color: AppColors.textPrimary,
-                      size: 20,
-                    ),
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'Lyrics',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: AppFonts.sans,
-                        fontFamilyFallback: AppFonts.fallback,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_bgColor ?? AppColors.background, AppColors.background],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // ── Top bar ──────────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
                         color: AppColors.textPrimary,
+                        size: 20,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 48),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── Album art ────────────────────────────────────────────────────
-            TrackThumbnail(
-              size: 80,
-              assetPath: widget.track.thumbnailPath,
-              borderRadius: 8,
-            ),
-
-            const SizedBox(height: 8),
-
-            // ── Track title + artist ─────────────────────────────────────────
-            Text(
-              widget.track.title,
-              style: const TextStyle(
-                fontFamily: AppFonts.sans,
-                fontFamilyFallback: AppFonts.fallback,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              widget.track.artist,
-              style: const TextStyle(
-                fontFamily: AppFonts.sans,
-                fontFamilyFallback: AppFonts.fallback,
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Lyrics ───────────────────────────────────────────────────────
-            Expanded(
-              child: _lines.isEmpty
-                  ? _emptyState(widget.track.lyricsPath, _isLoading)
-                  : NotificationListener<ScrollNotification>(
-                      onNotification: (n) {
-                        // Detect user scrolling to suppress auto-scroll temporarily
-                        if (n is ScrollStartNotification &&
-                            n.dragDetails != null) {
-                          _userScrolling = true;
-                        } else if (n is ScrollEndNotification) {
-                          Future.delayed(const Duration(seconds: 3), () {
-                            if (mounted) _userScrolling = false;
-                          });
-                        }
-                        return false;
-                      },
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 28,
-                          vertical: 20,
+                    const Expanded(
+                      child: Text(
+                        'Lyrics',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: AppFonts.sans,
+                          fontFamilyFallback: AppFonts.fallback,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
-                        itemCount: _lines.length,
-                        itemBuilder: (context, i) {
-                          final isActive = i == _activeIndex;
-                          return GestureDetector(
-                            key: _keys[i],
-                            onTap: () {
-                              // Tap a line to seek there
-                              final ms = _lines[i].timestamp.inMilliseconds;
-                              final total = svc.duration.inMilliseconds;
-                              if (total > 0) svc.seekToFraction(ms / total);
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              child: AnimatedDefaultTextStyle(
-                                duration: const Duration(milliseconds: 200),
-                                style: TextStyle(
-                                  fontFamily: AppFonts.sans,
-                                  fontFamilyFallback: AppFonts.fallback,
-                                  fontSize: isActive ? 18 : 14,
-                                  fontWeight: isActive
-                                      ? FontWeight.w700
-                                      : FontWeight.w400,
-                                  color: isActive
-                                      ? AppColors.accent
-                                      : AppColors.textPrimary.withOpacity(0.45),
-                                  height: 1.5,
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // ── Album art ────────────────────────────────────────────────────
+              TrackThumbnail(
+                size: 80,
+                assetPath: widget.track.thumbnailPath,
+                borderRadius: 8,
+              ),
+
+              const SizedBox(height: 8),
+
+              // ── Track title + artist ─────────────────────────────────────────
+              Text(
+                widget.track.title,
+                style: const TextStyle(
+                  fontFamily: AppFonts.sans,
+                  fontFamilyFallback: AppFonts.fallback,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                widget.track.artist,
+                style: const TextStyle(
+                  fontFamily: AppFonts.sans,
+                  fontFamilyFallback: AppFonts.fallback,
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ── Lyrics ───────────────────────────────────────────────────────
+              Expanded(
+                child: _lines.isEmpty
+                    ? _emptyState(widget.track.lyricsPath, _isLoading)
+                    : NotificationListener<ScrollNotification>(
+                        onNotification: (n) {
+                          // Detect user scrolling to suppress auto-scroll temporarily
+                          if (n is ScrollStartNotification &&
+                              n.dragDetails != null) {
+                            _userScrolling = true;
+                          } else if (n is ScrollEndNotification) {
+                            Future.delayed(const Duration(seconds: 3), () {
+                              if (mounted) _userScrolling = false;
+                            });
+                          }
+                          return false;
+                        },
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
+                            vertical: 20,
+                          ),
+                          itemCount: _lines.length,
+                          itemBuilder: (context, i) {
+                            final isActive = i == _activeIndex;
+                            return GestureDetector(
+                              key: _keys[i],
+                              onTap: () {
+                                // Tap a line to seek there
+                                final ms = _lines[i].timestamp.inMilliseconds;
+                                final total = svc.duration.inMilliseconds;
+                                if (total > 0) svc.seekToFraction(ms / total);
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
                                 ),
-                                child: Text(
-                                  _lines[i].text,
-                                  textAlign: TextAlign.center,
+                                child: AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 200),
+                                  style: TextStyle(
+                                    fontFamily: AppFonts.sans,
+                                    fontFamilyFallback: AppFonts.fallback,
+                                    fontSize: isActive ? 18 : 14,
+                                    fontWeight: isActive
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                    color: isActive
+                                        ? AppColors.accent
+                                        : AppColors.textPrimary.withOpacity(
+                                            0.45,
+                                          ),
+                                    height: 1.5,
+                                  ),
+                                  child: Text(
+                                    _lines[i].text,
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-                    ),
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
