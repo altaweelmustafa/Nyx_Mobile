@@ -42,8 +42,8 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-        height: 280,
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+        height: 200,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: AppColors.surfaceHigh, // fallback if no art
@@ -97,7 +97,7 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
                     // Nyx logo top-left
                     Image.asset('assets/icons/nyx_logo.png', width: 48, height: 48),
 
-                    const Spacer(flex: 2),
+                    const Spacer(flex: 1),
 
                     // Title
                     Text(
@@ -128,7 +128,7 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
                       overflow: TextOverflow.ellipsis,
                     ),
 
-                    const Spacer(flex: 1),
+                    const SizedBox(height: 4),
 
                     // Bluetooth row
                     const BluetoothIndicator(
@@ -137,7 +137,7 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
                       nameWidth: 220,
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 6),
 
                     // Transport controls
                     Row(
@@ -183,7 +183,7 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
                     // Waveform — white active on top of blurred art looks great
                     WaveformScrubber(
                       progress: svc.progress,
-                      height: 36,
+                      height: 24,
                       activeColor: Colors.white,
                       passiveColor: Colors.white.withOpacity(0.22),
                       thumbColor: Colors.white,
