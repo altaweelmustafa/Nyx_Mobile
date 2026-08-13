@@ -67,6 +67,10 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/icons/nyx_logo.png"
   min_sdk_android: 21
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/icons/nyx_logo.png"
+  remove_alpha_ios: true
+  background_color_ios: "#000000"
   web:
     generate: true
     image_path: "assets/icons/nyx_logo.png"
