@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:window_manager/window_manager.dart';
 import 'theme/app_theme.dart';
 import 'screens/start_screen.dart';
 import 'services/audio_player_service.dart';
@@ -15,6 +16,12 @@ import 'services/bluetooth_route_service.dart';
 import 'services/jam_service.dart';
 import 'services/library_service.dart';
 import 'services/nyx_audio_handler.dart';
+import 'widgets/custom_title_bar.dart';
+
+/// window_manager only has real desktop implementations on these three --
+/// on Android/iOS it's a no-op window concept that doesn't apply.
+bool get _isDesktopPlatform =>
+    Platform.isLinux || Platform.isWindows || Platform.isMacOS;
 
 /// libmpv's ffmpeg backend (used for the Linux audio backend below) resolves
 /// its on-disk stream cache directory the same way any C program would --
@@ -99,6 +106,27 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Hides the OS-native title bar (title text, minimize/maximize/close) in
+  // favor of CustomTitleBar, drawn in-app so it matches the rest of the UI
+  // instead of looking like a generic GTK/Win32 window. windowButtonVisibility:
+  // false additionally suppresses the native buttons on platforms (Windows)
+  // that would otherwise still draw them even with the title bar hidden.
+  if (_isDesktopPlatform) {
+    await windowManager.ensureInitialized();
+    const windowOptions = WindowOptions(
+      size: Size(1280, 720),
+      minimumSize: Size(720, 480),
+      center: true,
+      backgroundColor: Colors.transparent,
+      titleBarStyle: TitleBarStyle.hidden,
+      windowButtonVisibility: false,
+    );
+    windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
+  }
+
   runApp(
     MultiProvider(
       providers: [
@@ -121,6 +149,18 @@ class BragerApp extends StatelessWidget {
       title: 'Nyx',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
+      // `builder` wraps every route the Navigator ever pushes (not just
+      // `home`), so the custom title bar stays pinned above the whole app
+      // -- Settings, the track player, Jam, all of it -- instead of only
+      // the first screen.
+      builder: !_isDesktopPlatform
+          ? null
+          : (context, child) => Column(
+                children: [
+                  const CustomTitleBar(),
+                  Expanded(child: child ?? const SizedBox.shrink()),
+                ],
+              ),
       home: const StartScreen(),
     );
   }

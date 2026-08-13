@@ -23,6 +23,36 @@ class AppFonts {
   static const fallback = [arabic];
 }
 
+/// Single width breakpoint gating every desktop-only layout change (sidebar
+/// nav, content max-width, card grids). No Android phone -- portrait or
+/// landscape -- reaches 900 logical px, and the Linux/Windows GTK window
+/// defaults to 1280, so this cleanly separates "phone" from "desktop
+/// window" without any per-screen logic.
+class AppBreakpoints {
+  static const desktop = 900.0;
+}
+
+extension ResponsiveContext on BuildContext {
+  bool get isDesktop => MediaQuery.sizeOf(this).width >= AppBreakpoints.desktop;
+}
+
+/// Width [boundToDesktopWidth] caps content at on desktop -- a phone-shaped
+/// column looks intentional at this width instead of stretching
+/// edge-to-edge into a 1280px window.
+const kDesktopContentMaxWidth = 1040.0;
+
+/// Caps [child] at [kDesktopContentMaxWidth] and centers it on desktop --
+/// a no-op below the breakpoint, so phone screens are unaffected.
+Widget boundToDesktopWidth(BuildContext context, Widget child) {
+  if (!context.isDesktop) return child;
+  return Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: kDesktopContentMaxWidth),
+      child: child,
+    ),
+  );
+}
+
 class AppTheme {
   static ThemeData get dark {
     return ThemeData(

@@ -53,7 +53,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final thumbnails = await Future.wait(
       playlists.map((p) async {
         final tracks = await _playlistRepo.getTracks(p.id);
-        return MapEntry(p.id, tracks.isNotEmpty ? tracks.first.thumbnailPath : null);
+        return MapEntry(
+          p.id,
+          tracks.isNotEmpty ? tracks.first.thumbnailPath : null,
+        );
       }),
     );
     if (!mounted) return;
@@ -71,7 +74,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
     await _playlistRepo.setLiked(playlist.id, false);
     if (!mounted) return;
     setState(() => _playlists.removeWhere((p) => p.id == playlist.id));
-    NyxToast.show(context, 'Removed from Your Library', icon: Icons.favorite_border);
+    NyxToast.show(
+      context,
+      'Removed from Your Library',
+      icon: Icons.favorite_border,
+    );
   }
 
   Future<void> _createPlaylist() async {
@@ -80,12 +87,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('New Playlist', style: TextStyle(color: AppColors.textPrimary)),
+        title: const Text(
+          'New Playlist',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
         content: TextField(
           controller: controller,
           autofocus: true,
           style: const TextStyle(color: AppColors.textPrimary),
-          decoration: const InputDecoration(hintText: 'Playlist name', border: OutlineInputBorder()),
+          decoration: const InputDecoration(
+            hintText: 'Playlist name',
+            border: OutlineInputBorder(),
+          ),
           onSubmitted: (v) => Navigator.of(dialogContext).pop(v.trim()),
         ),
         actions: [
@@ -94,7 +107,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
             child: const Text('Create'),
           ),
         ],
@@ -114,9 +128,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Future<void> _openLikedTracks() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const LikedTracksScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const LikedTracksScreen()));
     _load();
   }
 
@@ -124,108 +138,112 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: AppColors.accent),
-              )
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 160),
-                children: [
-                  // ── Header ────────────────────────────────────────────────
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Your Library',
-                          style: Theme.of(context).textTheme.headlineMedium,
+      body: boundToDesktopWidth(
+        context,
+        SafeArea(
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.accent),
+                )
+              : ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 160),
+                  children: [
+                    // ── Header ────────────────────────────────────────────────
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Your Library',
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        tooltip: 'Create Playlist',
-                        onPressed: _createPlaylist,
-                        icon: const Icon(
-                          Icons.add_circle_outline,
-                          color: AppColors.textPrimary,
-                          size: 24,
+                        IconButton(
+                          tooltip: 'Create Playlist',
+                          onPressed: _createPlaylist,
+                          icon: const Icon(
+                            Icons.add_circle_outline,
+                            color: AppColors.textPrimary,
+                            size: 24,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
 
-                  // ── Liked Tracks ─────────────────────────────────────────
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _openLikedTracks,
-                    child: _LibraryRow(
-                      leading: Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceHigh,
-                          borderRadius: BorderRadius.circular(6),
+                    // ── Liked Tracks ─────────────────────────────────────────
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _openLikedTracks,
+                      child: _LibraryRow(
+                        leading: Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceHigh,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(
+                            Icons.favorite,
+                            color: AppColors.accent,
+                            size: 24,
+                          ),
                         ),
-                        child: const Icon(
+                        title: 'Liked Tracks',
+                        subtitle: '$_likedCount TRACKS',
+                        trailing: const Icon(
                           Icons.favorite,
                           color: AppColors.accent,
-                          size: 24,
+                          size: 20,
                         ),
                       ),
-                      title: 'Liked Tracks',
-                      subtitle: '$_likedCount TRACKS',
-                      trailing: const Icon(
-                        Icons.favorite,
-                        color: AppColors.accent,
-                        size: 20,
-                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 4),
-                  const Divider(),
-                  const SizedBox(height: 4),
+                    const SizedBox(height: 4),
+                    const Divider(),
+                    const SizedBox(height: 4),
 
-                  // ── Playlists ─────────────────────────────────────────────
-                  ..._playlists.map(
-                    (playlist) => Column(
-                      children: [
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => PlaylistScreen(playlist: playlist),
+                    // ── Playlists ─────────────────────────────────────────────
+                    ..._playlists.map(
+                      (playlist) => Column(
+                        children: [
+                          GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      PlaylistScreen(playlist: playlist),
+                                ),
+                              );
+                              _load();
+                            },
+                            child: _LibraryRow(
+                              leading: TrackThumbnail(
+                                size: 52,
+                                borderRadius: 6,
+                                assetPath: _playlistThumbnails[playlist.id],
                               ),
-                            );
-                            _load();
-                          },
-                          child: _LibraryRow(
-                            leading: TrackThumbnail(
-                              size: 52,
-                              borderRadius: 6,
-                              assetPath: _playlistThumbnails[playlist.id],
-                            ),
-                            title: playlist.name,
-                            subtitle: '${playlist.trackCount} TRACKS',
-                            trailing: GestureDetector(
-                              onTap: () => _unlikePlaylist(playlist),
-                              child: const Icon(
-                                Icons.favorite,
-                                color: AppColors.accent,
-                                size: 20,
+                              title: playlist.name,
+                              subtitle: '${playlist.trackCount} TRACKS',
+                              trailing: GestureDetector(
+                                onTap: () => _unlikePlaylist(playlist),
+                                child: const Icon(
+                                  Icons.favorite,
+                                  color: AppColors.accent,
+                                  size: 20,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Divider(),
-                        const SizedBox(height: 4),
-                      ],
+                          const SizedBox(height: 4),
+                          const Divider(),
+                          const SizedBox(height: 4),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+        ),
       ),
     );
   }

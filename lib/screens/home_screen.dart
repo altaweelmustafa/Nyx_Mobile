@@ -5,15 +5,19 @@ import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../models/playlist.dart';
 import '../models/track.dart';
+import '../repositories/artist_repository.dart';
 import '../repositories/playlist_repository.dart';
 import '../repositories/track_repository.dart';
 import '../services/audio_player_service.dart';
 import '../services/library_service.dart';
+import '../utils/artist_names.dart';
+import '../widgets/responsive_card_row.dart';
 import '../widgets/song_actions.dart';
+import '../widgets/track_row_tap.dart';
 import '../widgets/track_thumbnail.dart';
+import 'artist_screen.dart';
 import 'liked_tracks_screen.dart';
 import 'playlist_screen.dart';
-import 'track_view_screen.dart';
 
 /// One card slot in the Home "Recommended" row -- either a track or an
 /// artist profile (identified by name only, so it always resolves against
@@ -41,6 +45,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _trackRepo = TrackRepository();
   final _playlistRepo = PlaylistRepository();
+  final _artistRepo = ArtistRepository();
   List<Playlist> _playlists = [];
   final Map<String, String?> _playlistThumbnails = {};
   int _likedCount = 0;
@@ -78,18 +83,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final playlistsFuture = _playlistRepo.getLiked();
     final likedFuture = _trackRepo.getLiked();
     final mostPlayedFuture = _trackRepo.getMostPlayed(10);
-    final recommendedFuture = _trackRepo.getRecommendedMix(12);
-    final artistsFuture = _trackRepo.getRandomArtists(2);
+    final recommendedFuture = _trackRepo.getRecentlyAddedMix(12);
 
     final playlists = await playlistsFuture;
     final liked = await likedFuture;
     final mostPlayed = await mostPlayedFuture;
     final recommended = await recommendedFuture;
-    final artists = await artistsFuture;
+    final artistProfiles = await _artistRepo.getAll();
+    final photoByArtist = {for (final a in artistProfiles) a.name: a.photoPath};
+    final artists = _newArtistsFrom(recommended, photoByArtist);
     final thumbnails = await Future.wait(
       playlists.map((p) async {
         final tracks = await _playlistRepo.getTracks(p.id);
-        return MapEntry(p.id, tracks.isNotEmpty ? tracks.first.thumbnailPath : null);
+        return MapEntry(
+          p.id,
+          tracks.isNotEmpty ? tracks.first.thumbnailPath : null,
+        );
       }),
     );
     if (!mounted) return;
@@ -107,6 +116,33 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  /// Distinct (split) artists among [tracks] -- since [tracks] already
+  /// comes from getRecentlyAddedMix (one representative track per new
+  /// artist), this just reads back the artist behind each representative.
+  /// Prefers each artist's real synced cover ([photoByArtist]) over a
+  /// track thumbnail stand-in. Capped so a big batch upload doesn't turn
+  /// the row into all artist cards and no track cards.
+  List<({String name, String? thumbnailPath})> _newArtistsFrom(
+    List<Track> tracks,
+    Map<String, String?> photoByArtist, {
+    int cap = 4,
+  }) {
+    final seen = <String>{};
+    final result = <({String name, String? thumbnailPath})>[];
+    for (final track in tracks) {
+      for (final name in splitArtists(track.artist)) {
+        if (seen.add(name)) {
+          result.add((
+            name: name,
+            thumbnailPath: photoByArtist[name] ?? track.thumbnailPath,
+          ));
+        }
+      }
+      if (result.length >= cap) break;
+    }
+    return result.take(cap).toList();
+  }
+
   /// Splices artist cards into random positions among the recommended
   /// tracks -- recomputed on every load so it reshuffles each visit.
   List<_RecItem> _mixInArtists(
@@ -122,17 +158,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return items;
   }
 
-  void _play(BuildContext context, List<Track> queue, int index) {
-    context.read<AudioPlayerService>().playQueue(queue, index);
+  void _openArtist(String artist, String? thumbnailPath) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TrackViewScreen(track: queue[index])),
+      MaterialPageRoute(
+        builder: (_) =>
+            ArtistScreen(artist: artist, thumbnailPath: thumbnailPath),
+      ),
     );
-  }
-
-  Future<void> _playArtist(String artist) async {
-    final tracks = await _trackRepo.getByArtist(artist);
-    if (!mounted || tracks.isEmpty) return;
-    _play(context, tracks, 0);
   }
 
   Future<void> _openPlaylist(Playlist playlist) async {
@@ -142,9 +174,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openLikedTracks() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const LikedTracksScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const LikedTracksScreen()));
   }
 
   void _showSongOptions(
@@ -183,61 +215,64 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: AppColors.accent),
-              )
-            : ListView(
-                padding: const EdgeInsets.only(bottom: 160),
-                children: [
-                  const SizedBox(height: 24),
+      body: boundToDesktopWidth(
+        context,
+        SafeArea(
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.accent),
+                )
+              : ListView(
+                  padding: const EdgeInsets.only(bottom: 160),
+                  children: [
+                    const SizedBox(height: 44),
 
-                  // ── Playlists ────────────────────────────────────────────────
-                  _PlaylistRow(
-                    playlists: _playlists,
-                    playlistThumbnails: _playlistThumbnails,
-                    likedCount: _likedCount,
-                    likedThumbnail: _likedThumbnail,
-                    onTap: _openPlaylist,
-                    onTapLikedSongs: _openLikedTracks,
-                  ),
-                  const SizedBox(height: 32),
-
-                  // ── Most Played ──────────────────────────────────────────────
-                  if (_mostPlayed.isNotEmpty) ...[
-                    const _SectionHeader(title: 'Most Played'),
-                    const SizedBox(height: 16),
-                    _TrackCardRow(
-                      tracks: _mostPlayed,
-                      onTap: (i) => _play(context, _mostPlayed, i),
-                      onOptionsTap: (i) => _showSongOptions(_mostPlayed, i),
+                    // ── Playlists ────────────────────────────────────────────────
+                    _PlaylistRow(
+                      playlists: _playlists,
+                      playlistThumbnails: _playlistThumbnails,
+                      likedCount: _likedCount,
+                      likedThumbnail: _likedThumbnail,
+                      onTap: _openPlaylist,
+                      onTapLikedSongs: _openLikedTracks,
                     ),
-                    const SizedBox(height: 32),
-                  ],
+                    const SizedBox(height: 44),
 
-                  // ── Recommended ──────────────────────────────────────────────
-                  if (_recommendedDisplay.isNotEmpty) ...[
-                    const _SectionHeader(title: 'Recommended'),
-                    const SizedBox(height: 16),
-                    _RecommendedRow(
-                      items: _recommendedDisplay,
-                      recommended: _recommended,
-                      onTapTrack: (index) =>
-                          _play(context, _recommended, index),
-                      onOptionsTap: (index) => _showSongOptions(
-                        _recommended,
-                        index,
-                        isRecommended: true,
+                    // ── Most Played ──────────────────────────────────────────────
+                    if (_mostPlayed.isNotEmpty) ...[
+                      const _SectionHeader(title: 'Most Played'),
+                      const SizedBox(height: 16),
+                      _TrackCardRow(
+                        tracks: _mostPlayed,
+                        onTap: (i) => handleTrackTap(context, _mostPlayed, i),
+                        onOptionsTap: (i) => _showSongOptions(_mostPlayed, i),
                       ),
-                      onTapArtist: _playArtist,
-                    ),
-                    const SizedBox(height: 32),
-                  ],
+                      const SizedBox(height: 32),
+                    ],
 
-                  const SizedBox(height: 40),
-                ],
-              ),
+                    // ── Recommended ──────────────────────────────────────────────
+                    if (_recommendedDisplay.isNotEmpty) ...[
+                      const _SectionHeader(title: 'Recommended'),
+                      const SizedBox(height: 16),
+                      _RecommendedRow(
+                        items: _recommendedDisplay,
+                        recommended: _recommended,
+                        onTapTrack: (index) =>
+                            handleTrackTap(context, _recommended, index),
+                        onOptionsTap: (index) => _showSongOptions(
+                          _recommended,
+                          index,
+                          isRecommended: true,
+                        ),
+                        onTapArtist: _openArtist,
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+
+                    const SizedBox(height: 40),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -259,7 +294,7 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ── Playlists: thin, sharp-edged tiles ──────────────────────────────────────
+// ── Playlists: rounded cards with a bit of breathing room ───────────────────
 
 class _PlaylistRow extends StatelessWidget {
   final List<Playlist> playlists;
@@ -280,34 +315,24 @@ class _PlaylistRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final itemCount = playlists.length + 1; // +1 for Liked Songs
-
-    return SizedBox(
-      height: 44,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: itemCount,
-        itemBuilder: (context, i) {
-          final child = i == 0
-              ? _PlaylistTile(
-                  name: 'Liked Songs',
-                  subtitle: '$likedCount TRACKS',
-                  thumbnailPath: likedThumbnail,
-                  onTap: onTapLikedSongs,
-                )
-              : _PlaylistTile(
-                  name: playlists[i - 1].name,
-                  subtitle: '${playlists[i - 1].trackCount} TRACKS',
-                  thumbnailPath: playlistThumbnails[playlists[i - 1].id],
-                  onTap: () => onTap(playlists[i - 1]),
-                );
-          return Padding(
-            padding: EdgeInsets.only(right: i < itemCount - 1 ? 12 : 0),
-            child: child,
-          );
-        },
-      ),
+    return ResponsiveCardRow(
+      mobileHeight: 68,
+      spacing: 14,
+      children: [
+        _PlaylistTile(
+          name: 'Liked Songs',
+          subtitle: '$likedCount TRACKS',
+          thumbnailPath: likedThumbnail,
+          onTap: onTapLikedSongs,
+        ),
+        for (final p in playlists)
+          _PlaylistTile(
+            name: p.name,
+            subtitle: '${p.trackCount} TRACKS',
+            thumbnailPath: playlistThumbnails[p.id],
+            onTap: () => onTap(p),
+          ),
+      ],
     );
   }
 }
@@ -331,16 +356,21 @@ class _PlaylistTile extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
-        width: 200,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: const BoxDecoration(
+        width: 216,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
           color: AppColors.surfaceHigh,
-          borderRadius: BorderRadius.zero,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.divider),
         ),
         child: Row(
           children: [
-            TrackThumbnail(size: 32, assetPath: thumbnailPath, borderRadius: 0),
-            const SizedBox(width: 10),
+            TrackThumbnail(
+              size: 48,
+              assetPath: thumbnailPath,
+              borderRadius: 10,
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -353,21 +383,23 @@ class _PlaylistTile extends StatelessWidget {
                     style: const TextStyle(
                       fontFamily: AppFonts.sans,
                       fontFamilyFallback: AppFonts.fallback,
-                      fontSize: 13,
+                      fontSize: 14,
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: 3),
                   Text(
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontFamily: AppFonts.sans,
+                      fontFamily: AppFonts.mono,
                       fontFamilyFallback: AppFonts.fallback,
                       fontSize: 10,
+                      letterSpacing: 0.6,
                       color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w400,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -398,26 +430,17 @@ class _TrackCardRow extends StatelessWidget {
     if (tracks.isEmpty) return const SizedBox.shrink();
     final currentTrackId = context.watch<AudioPlayerService>().currentTrack?.id;
 
-    return SizedBox(
-      height: 188,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: tracks.length,
-        itemBuilder: (context, i) {
-          final track = tracks[i];
-          final isNowPlaying = track.id == currentTrackId;
-          return Padding(
-            padding: EdgeInsets.only(right: i < tracks.length - 1 ? 12 : 0),
-            child: _TrackCard(
-              track: track,
-              isNowPlaying: isNowPlaying,
-              onTap: () => onTap(i),
-              onOptionsTap: () => onOptionsTap(i),
-            ),
-          );
-        },
-      ),
+    return ResponsiveCardRow(
+      mobileHeight: 188,
+      children: [
+        for (int i = 0; i < tracks.length; i++)
+          _TrackCard(
+            track: tracks[i],
+            isNowPlaying: tracks[i].id == currentTrackId,
+            onTap: () => onTap(i),
+            onOptionsTap: () => onOptionsTap(i),
+          ),
+      ],
     );
   }
 }
@@ -514,7 +537,7 @@ class _RecommendedRow extends StatelessWidget {
   final List<Track> recommended;
   final void Function(int index) onTapTrack;
   final void Function(int index) onOptionsTap;
-  final void Function(String artist) onTapArtist;
+  final void Function(String artist, String? thumbnailPath) onTapArtist;
 
   const _RecommendedRow({
     required this.items,
@@ -529,44 +552,34 @@ class _RecommendedRow extends StatelessWidget {
     if (items.isEmpty) return const SizedBox.shrink();
     final currentTrackId = context.watch<AudioPlayerService>().currentTrack?.id;
 
-    return SizedBox(
-      height: 188,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: items.length,
-        itemBuilder: (context, i) {
-          final item = items[i];
-          final padding = EdgeInsets.only(right: i < items.length - 1 ? 12 : 0);
+    final cards = <Widget>[];
+    for (final item in items) {
+      if (item is _RecArtistItem) {
+        cards.add(
+          _ArtistCard(
+            name: item.artist,
+            thumbnailPath: item.thumbnailPath,
+            onTap: () => onTapArtist(item.artist, item.thumbnailPath),
+          ),
+        );
+        continue;
+      }
 
-          if (item is _RecArtistItem) {
-            return Padding(
-              padding: padding,
-              child: _ArtistCard(
-                name: item.artist,
-                thumbnailPath: item.thumbnailPath,
-                onTap: () => onTapArtist(item.artist),
-              ),
-            );
-          }
+      final trackId = (item as _RecTrackItem).trackId;
+      final index = recommended.indexWhere((t) => t.id == trackId);
+      if (index == -1) continue;
+      final track = recommended[index];
+      cards.add(
+        _TrackCard(
+          track: track,
+          isNowPlaying: track.id == currentTrackId,
+          onTap: () => onTapTrack(index),
+          onOptionsTap: () => onOptionsTap(index),
+        ),
+      );
+    }
 
-          final trackId = (item as _RecTrackItem).trackId;
-          final index = recommended.indexWhere((t) => t.id == trackId);
-          if (index == -1) return const SizedBox.shrink();
-          final track = recommended[index];
-
-          return Padding(
-            padding: padding,
-            child: _TrackCard(
-              track: track,
-              isNowPlaying: track.id == currentTrackId,
-              onTap: () => onTapTrack(index),
-              onOptionsTap: () => onOptionsTap(index),
-            ),
-          );
-        },
-      ),
-    );
+    return ResponsiveCardRow(mobileHeight: 188, children: cards);
   }
 }
 

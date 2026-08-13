@@ -3,13 +3,16 @@ import 'package:provider/provider.dart';
 import '../screens/track_view_screen.dart';
 import '../services/audio_player_service.dart';
 import '../theme/app_theme.dart';
+import 'desktop_player_bar.dart';
 import 'mini_player.dart';
 
-/// A Scaffold that docks the compact [MiniPlayer] to the bottom of the
-/// screen whenever a track is loaded, so playback controls stay reachable
-/// everywhere in the app (not just the three shell tabs). Renders nothing
-/// extra when there's no current track -- MiniPlayer collapses to zero
-/// height itself.
+/// A Scaffold that docks a playback bar to the bottom of the screen
+/// whenever a track is loaded, so playback controls stay reachable
+/// everywhere in the app (not just the three shell tabs) -- the compact
+/// [MiniPlayer] on phone, the full-width [DesktopPlayerBar] on desktop.
+/// Renders nothing extra when there's no current track -- both collapse to
+/// zero height themselves. On desktop, [body] is also capped at
+/// [kDesktopContentMaxWidth] and centered instead of stretching full width.
 class AppScaffold extends StatelessWidget {
   final Widget body;
   final PreferredSizeWidget? appBar;
@@ -34,16 +37,20 @@ class AppScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDesktop = context.isDesktop;
+
     return Scaffold(
       backgroundColor: backgroundColor ?? AppColors.background,
       appBar: appBar,
-      body: body,
-      bottomNavigationBar: showMiniPlayer
-          ? SafeArea(
+      body: boundToDesktopWidth(context, body),
+      bottomNavigationBar: !showMiniPlayer
+          ? null
+          : isDesktop
+          ? DesktopPlayerBar(onTap: () => _openPlayer(context))
+          : SafeArea(
               top: false,
               child: MiniPlayer(onTap: () => _openPlayer(context)),
-            )
-          : null,
+            ),
     );
   }
 }

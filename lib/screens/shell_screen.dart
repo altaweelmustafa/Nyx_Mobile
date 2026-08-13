@@ -4,6 +4,7 @@ import '../repositories/profile_repository.dart';
 import '../theme/app_theme.dart';
 import '../services/audio_player_service.dart';
 import '../services/catalog_sync_service.dart';
+import '../widgets/desktop_player_bar.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/home_mini_player.dart';
 import 'home_screen.dart';
@@ -48,9 +49,9 @@ class _ShellScreenState extends State<ShellScreen> {
   void _openPlayer() {
     final track = context.read<AudioPlayerService>().currentTrack;
     if (track == null) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => TrackViewScreen(track: track)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => TrackViewScreen(track: track)));
   }
 
   void _openProfile() {
@@ -61,6 +62,31 @@ class _ShellScreenState extends State<ShellScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (context.isDesktop) {
+      // Sidebar nav + a full-width player bar pinned under the content,
+      // instead of the phone's bottom tab bar + floating mini player.
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: Column(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  _Sidebar(
+                    currentIndex: _currentIndex,
+                    onTap: (i) => setState(() => _currentIndex = i),
+                    onProfileTap: _openProfile,
+                  ),
+                  Expanded(child: _screens[_currentIndex]),
+                ],
+              ),
+            ),
+            DesktopPlayerBar(onTap: _openPlayer),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Stack(
@@ -91,6 +117,125 @@ class _ShellScreenState extends State<ShellScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Sidebar nav (desktop) ────────────────────────────────────────────────────
+
+class _Sidebar extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
+  final VoidCallback onProfileTap;
+
+  const _Sidebar({
+    required this.currentIndex,
+    required this.onTap,
+    required this.onProfileTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 240,
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(right: BorderSide(color: AppColors.divider)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              'NYX',
+              style: TextStyle(
+                fontFamily: AppFonts.mono,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                letterSpacing: 2,
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          _SidebarItem(
+            icon: Icons.home,
+            label: 'Home',
+            isSelected: currentIndex == 0,
+            onTap: () => onTap(0),
+          ),
+          _SidebarItem(
+            icon: Icons.library_books_outlined,
+            label: 'Library',
+            isSelected: currentIndex == 1,
+            onTap: () => onTap(1),
+          ),
+          _SidebarItem(
+            icon: Icons.search,
+            label: 'Search',
+            isSelected: currentIndex == 2,
+            onTap: () => onTap(2),
+          ),
+          const Spacer(),
+          _SidebarItem(
+            icon: Icons.person,
+            label: 'Profile',
+            isSelected: false,
+            onTap: onProfileTap,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SidebarItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SidebarItem({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isSelected ? AppColors.textPrimary : AppColors.textSecondary;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Material(
+        color: isSelected ? AppColors.surfaceHigh : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              children: [
+                Icon(icon, size: 22, color: color),
+                const SizedBox(width: 14),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: AppFonts.sans,
+                    fontFamilyFallback: AppFonts.fallback,
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

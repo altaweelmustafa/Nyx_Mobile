@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import '../db/app_database.dart';
 import '../models/track.dart';
 import '../services/library_service.dart';
+import '../utils/artist_names.dart';
 
 class TrackRepository {
   Future<List<Track>> _query(String where, [List<Object?>? args]) async {
@@ -43,41 +44,6 @@ class TrackRepository {
     return rows.map(Track.fromMap).toList();
   }
 
-  /// Tracks you haven't played yet, by artists you've recently been
-  /// listening to. Simple "you might also like" -- not a real recommender.
-  Future<List<Track>> getRecommended(int limit) async {
-    final db = await AppDatabase.instance.database;
-    final rows = await db.rawQuery(
-      '''
-      SELECT * FROM tracks
-      WHERE song != 'RADIO'
-        AND last_played_at IS NULL
-        AND artist IN (
-          SELECT DISTINCT artist FROM tracks
-          WHERE last_played_at IS NOT NULL
-          ORDER BY last_played_at DESC
-          LIMIT 5
-        )
-      ORDER BY liked DESC, id
-      LIMIT ?
-      ''',
-      [limit],
-    );
-    return rows.map(Track.fromMap).toList();
-  }
-
-  /// Most recently played tracks, newest first.
-  Future<List<Track>> getRecentlyPlayed(int limit) async {
-    final db = await AppDatabase.instance.database;
-    final rows = await db.query(
-      'tracks',
-      where: "song != 'RADIO' AND last_played_at IS NOT NULL",
-      orderBy: 'last_played_at DESC',
-      limit: limit,
-    );
-    return rows.map(Track.fromMap).toList();
-  }
-
   /// Most recently added tracks -- "new releases" in the absence of a real
   /// release-date field.
   Future<List<Track>> getNewReleases(int limit) async {
@@ -91,49 +57,73 @@ class TrackRepository {
     return rows.map(Track.fromMap).toList();
   }
 
-  /// Home screen's single "Recommended" shelf: recent plays, then
-  /// artist-based picks, then new releases, deduped by id and capped at
-  /// [limit]. Not a real recommender -- just enough variety to fill a row.
-  Future<List<Track>> getRecommendedMix(int limit) async {
-    final perSource = (limit / 2).ceil();
-    final sources = await Future.wait([
-      getRecentlyPlayed(perSource),
-      getRecommended(perSource),
-      getNewReleases(perSource),
-    ]);
-
-    final seen = <String>{};
-    final mixed = <Track>[];
-    for (final source in sources) {
-      for (final track in source) {
-        if (seen.add(track.id)) mixed.add(track);
-        if (mixed.length == limit) return mixed;
-      }
-    }
-    return mixed;
-  }
-
-  /// All tracks by [artist], for "play this artist" from an artist card.
-  Future<List<Track>> getByArtist(String artist) =>
-      _query("song != 'RADIO' AND artist = ?", [artist]);
-
-  /// A random sample of distinct artists in the library, each paired with
-  /// one of their track thumbnails to stand in for an artist photo (there's
-  /// no dedicated artist-image data). Used to sprinkle artist cards into the
-  /// Home "Recommended" row.
-  Future<List<({String name, String? thumbnailPath})>> getRandomArtists(
-    int count,
-  ) async {
+  /// All tracks credited to [artist], for "play this artist" from an artist
+  /// card. Matches via track_artists (individual split names), so a track
+  /// credited to "Grimes & Lizzy Wizzy" shows up under both artists, not
+  /// just an exact match on the raw joined string.
+  Future<List<Track>> getByArtist(String artist) async {
     final db = await AppDatabase.instance.database;
     final rows = await db.rawQuery(
       '''
-      SELECT artist, thumbnail_path FROM tracks
-      WHERE song != 'RADIO'
-      GROUP BY artist
-      ORDER BY RANDOM()
+      SELECT t.* FROM tracks t
+      JOIN track_artists ta ON ta.track_id = t.id
+      WHERE t.song != 'RADIO' AND ta.artist_name = ?
+      ORDER BY t.id
+      ''',
+      [artist],
+    );
+    return rows.map(Track.fromMap).toList();
+  }
+
+  /// Escapes SQLite LIKE metacharacters (and the escape char itself) so a
+  /// literal '%' or '_' typed into search is matched literally, not as a
+  /// wildcard.
+  String _escapeLikePattern(String raw) =>
+      raw.replaceAll('!', '!!').replaceAll('%', '!%').replaceAll('_', '!_');
+
+  /// Title/artist search for the Search screen -- case-insensitive, capped
+  /// at [limit] so a broad query doesn't dump the whole library. Matches
+  /// artist via track_artists (individual names), not the raw column.
+  Future<List<Track>> searchTracks(String query, {int limit = 10}) async {
+    final db = await AppDatabase.instance.database;
+    final pattern = '%${_escapeLikePattern(query.toLowerCase())}%';
+    final rows = await db.rawQuery(
+      '''
+      SELECT DISTINCT t.* FROM tracks t
+      LEFT JOIN track_artists ta ON ta.track_id = t.id
+      WHERE t.song != 'RADIO'
+        AND (LOWER(t.title) LIKE ? ESCAPE '!' OR LOWER(ta.artist_name) LIKE ? ESCAPE '!')
+      ORDER BY t.id
       LIMIT ?
       ''',
-      [count],
+      [pattern, pattern, limit],
+    );
+    return rows.map(Track.fromMap).toList();
+  }
+
+  /// Distinct artist names matching [query], capped at [limit], each paired
+  /// with a thumbnail -- their real synced cover (artists.photo_path) when
+  /// orc has one cached, else a stand-in from one of their track
+  /// thumbnails. Backs the Search screen's artist row.
+  Future<List<({String name, String? thumbnailPath})>> searchArtists(
+    String query, {
+    int limit = 10,
+  }) async {
+    final db = await AppDatabase.instance.database;
+    final pattern = '%${_escapeLikePattern(query.toLowerCase())}%';
+    final rows = await db.rawQuery(
+      '''
+      SELECT ta.artist_name AS artist,
+             COALESCE(MIN(a.photo_path), MIN(t.thumbnail_path)) AS thumbnail_path
+      FROM track_artists ta
+      JOIN tracks t ON t.id = ta.track_id
+      LEFT JOIN artists a ON a.name = ta.artist_name
+      WHERE t.song != 'RADIO' AND LOWER(ta.artist_name) LIKE ? ESCAPE '!'
+      GROUP BY ta.artist_name
+      ORDER BY ta.artist_name
+      LIMIT ?
+      ''',
+      [pattern, limit],
     );
     return rows
         .map(
@@ -143,6 +133,51 @@ class TrackRepository {
           ),
         )
         .toList();
+  }
+
+  /// Newly-added tracks for Home's "Recommended" row, deduped to one
+  /// representative track per (split) artist -- uploading several songs by
+  /// the same artist at once shows that artist once, not every track; the
+  /// rest are one tap away on the artist's own page. [poolLimit] bounds how
+  /// far back into newest-first order to look while collecting [limit]
+  /// distinct-artist representatives.
+  Future<List<Track>> getRecentlyAddedMix(int limit, {int poolLimit = 60}) async {
+    final pool = await getNewReleases(poolLimit);
+    final seenArtists = <String>{};
+    final result = <Track>[];
+    for (final track in pool) {
+      final names = splitArtists(track.artist);
+      if (names.any((n) => !seenArtists.contains(n))) {
+        result.add(track);
+        seenArtists.addAll(names);
+        if (result.length == limit) break;
+      }
+    }
+    return result;
+  }
+
+  /// Random tracks not already in [excludeIds] -- used to keep the queue
+  /// going once a non-personal listening context (Recommended, an artist,
+  /// a search result, ...) runs out of tracks, instead of stopping playback.
+  Future<List<Track>> getAutoplaySuggestions(
+    Set<String> excludeIds,
+    int limit,
+  ) async {
+    final db = await AppDatabase.instance.database;
+    final ids = excludeIds.map(int.tryParse).whereType<int>().toList();
+    final exclusion = ids.isEmpty
+        ? ''
+        : 'AND id NOT IN (${List.filled(ids.length, '?').join(',')})';
+    final rows = await db.rawQuery(
+      '''
+      SELECT * FROM tracks
+      WHERE song != 'RADIO' $exclusion
+      ORDER BY RANDOM()
+      LIMIT ?
+      ''',
+      [...ids, limit],
+    );
+    return rows.map(Track.fromMap).toList();
   }
 
   Future<int> countLiked() async {
@@ -217,7 +252,7 @@ class TrackRepository {
     );
 
     if (existing.isEmpty) {
-      await db.insert('tracks', {
+      final id = await db.insert('tracks', {
         'title': title,
         'artist': artist,
         'song': song,
@@ -228,9 +263,11 @@ class TrackRepository {
         'liked': 0,
         'created_at': DateTime.now().millisecondsSinceEpoch,
       });
+      await _syncTrackArtists(db, id, artist);
       return true;
     }
 
+    final id = existing.first['id'] as int;
     await db.update(
       'tracks',
       {
@@ -243,7 +280,24 @@ class TrackRepository {
       where: 'slug = ?',
       whereArgs: [slug],
     );
+    await _syncTrackArtists(db, id, artist);
     return false;
+  }
+
+  /// Replaces track_artists for [trackId] with a fresh split of [artist] --
+  /// called on every write to `tracks` that can change its artist column,
+  /// so "which artist pages include this track" always matches the current
+  /// credit. Delete-then-reinsert rather than diffing, since this table is
+  /// tiny per track.
+  Future<void> _syncTrackArtists(Database db, int trackId, String artist) async {
+    await db.delete('track_artists', where: 'track_id = ?', whereArgs: [trackId]);
+    for (final name in splitArtists(artist)) {
+      await db.insert(
+        'track_artists',
+        {'track_id': trackId, 'artist_name': name},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
   }
 
   /// Deletes synced tracks (slug IS NOT NULL) whose slug is no longer in
@@ -283,6 +337,7 @@ class TrackRepository {
       'liked': 0,
       'created_at': DateTime.now().millisecondsSinceEpoch,
     });
+    await _syncTrackArtists(db, id, artist);
     LibraryService.instance.notifyChanged();
     return id.toString();
   }

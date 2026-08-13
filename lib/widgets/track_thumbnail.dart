@@ -47,7 +47,13 @@ class TrackThumbnail extends StatelessWidget {
           child: Icon(
             Icons.music_note,
             color: AppColors.background.withOpacity(0.4),
-            size: size * 0.4,
+            // Icon.size is a literal font size, not a layout constraint --
+            // unlike the SizedBox above, it isn't clamped by the parent, so
+            // size * 0.4 would hand text layout an infinite fontSize
+            // whenever a caller passes size: double.infinity (e.g. the
+            // full-bleed album art on TrackViewScreen) and the image is
+            // missing/fails to load.
+            size: size.isFinite ? size * 0.4 : 48,
           ),
         ),
       );

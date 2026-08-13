@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../repositories/artist_repository.dart';
 import '../repositories/track_repository.dart';
 import 'library_service.dart';
 
@@ -24,6 +25,7 @@ class SyncResult {
 class CatalogSyncService {
   final _dio = Dio();
   final _trackRepo = TrackRepository();
+  final _artistRepo = ArtistRepository();
 
   Future<SyncResult> syncFromServer(String baseUrl) async {
     final url = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
@@ -57,6 +59,8 @@ class CatalogSyncService {
 
     final removed = await _trackRepo.deleteMissingFromCatalog(catalogSlugs);
 
+    await _syncArtists(url);
+
     // One notification for the whole sync, not per track -- see
     // upsertFromCatalog's doc comment for why it doesn't notify itself.
     if (added > 0 || updated > 0 || removed > 0) {
@@ -64,5 +68,29 @@ class CatalogSyncService {
     }
 
     return SyncResult(total: tracks.length, added: added, updated: updated, removed: removed);
+  }
+
+  /// Pulls orc's artist photo/bio registry (GET /api/artists) and mirrors
+  /// it into the local `artists` table. Best-effort: orc's artist backfill
+  /// is a separate, occasionally-run step on that side, so this endpoint
+  /// may be briefly ahead of or behind the track catalog -- a failure here
+  /// shouldn't fail the whole sync since tracks already synced fine.
+  Future<void> _syncArtists(String url) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('$url/api/artists');
+      final entries = ((response.data?['artists'] as List?) ?? []).cast<Map<String, dynamic>>();
+      for (final entry in entries) {
+        final name = entry['artist'] as String?;
+        if (name == null) continue;
+        final photoPath = entry['photo_path'] as String?;
+        await _artistRepo.upsert(
+          name: name,
+          photoPath: photoPath != null ? '$url/assets/$photoPath' : null,
+          bio: entry['bio'] as String?,
+        );
+      }
+    } catch (_) {
+      // Non-fatal -- the track sync this call already did still counts.
+    }
   }
 }

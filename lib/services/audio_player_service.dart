@@ -28,6 +28,12 @@ class AudioPlayerService extends ChangeNotifier {
   Duration  _duration  = Duration.zero;
   bool      _isLoading = false;
 
+  // True only when the current queue came from a user-created playlist (or
+  // Liked Songs). Only in that context does reaching the end with looping
+  // off actually stop playback -- every other listening context (Recommended,
+  // an artist, search, Most Played, ...) keeps the music going indefinitely.
+  bool _isPersonalPlaylist = false;
+
   List<Track> _queue        = [];
   int             _currentIndex = -1;
 
@@ -96,16 +102,54 @@ class AudioPlayerService extends ChangeNotifier {
         _advanceQueue(wrap: true).whenComplete(() => _isAdvancing = false);
 
       case LoopMode.none:
-        if (_isShuffle || _currentIndex < _queue.length - 1) {
+        final atEnd = _isShuffle
+            ? _shuffleBag.isEmpty
+            : _currentIndex >= _queue.length - 1;
+        if (!atEnd) {
           _isAdvancing = true;
           _advanceQueue(wrap: false).whenComplete(() => _isAdvancing = false);
-        } else {
-          // End of queue — stop. Do NOT seek here: seeking on a completed player
-          // can auto-restart playback on the media_kit backend.
+        } else if (_isPersonalPlaylist) {
+          // A personal playlist with looping off -- respect the stop. Do NOT
+          // seek here: seeking on a completed player can auto-restart
+          // playback on the media_kit backend.
           _isPlaying = false;
           notifyListeners();
+        } else {
+          // Radio-style context (Recommended, an artist, search, ...) --
+          // never go silent, keep the music going.
+          _isAdvancing = true;
+          _autoContinue().whenComplete(() => _isAdvancing = false);
         }
     }
+  }
+
+  /// Extends the queue with fresh random tracks and plays the next one --
+  /// used when a non-personal listening context runs out of tracks so
+  /// playback never just stops.
+  Future<void> _autoContinue() async {
+    final excludeIds = _queue.map((t) => t.id).toSet();
+    var more = await _trackRepo.getAutoplaySuggestions(excludeIds, 15);
+    if (more.isEmpty && _currentTrack != null) {
+      // The whole library is already queued -- allow repeats rather than
+      // stop playback.
+      more = await _trackRepo.getAutoplaySuggestions({_currentTrack!.id}, 15);
+    }
+    if (more.isEmpty) {
+      _isPlaying = false;
+      notifyListeners();
+      return;
+    }
+
+    final insertedAt = _queue.length;
+    _queue.addAll(more);
+    if (_isShuffle) {
+      _shuffleBag = [for (int i = 0; i < more.length; i++) insertedAt + i];
+      _shuffleBag.shuffle(_rng);
+      _currentIndex = _shuffleBag.removeLast();
+    } else {
+      _currentIndex = insertedAt;
+    }
+    await _loadAndPlay(_queue[_currentIndex]);
   }
 
   // ── Public controls ────────────────────────────────────────────────────────
@@ -116,6 +160,7 @@ class AudioPlayerService extends ChangeNotifier {
       return;
     }
 
+    _isPersonalPlaylist = false;
     final existingIndex = _queue.indexWhere((t) => t.id == track.id);
     if (existingIndex == -1) {
       _queue = [track];
@@ -128,8 +173,15 @@ class AudioPlayerService extends ChangeNotifier {
     await _loadAndPlay(track);
   }
 
-  /// Set a full queue and start playing from [index].
-  Future<void> playQueue(List<Track> tracks, int index) async {
+  /// Set a full queue and start playing from [index]. [isPersonalPlaylist]
+  /// marks a user-created playlist (or Liked Songs) -- the only context
+  /// where reaching the end with looping off actually stops playback.
+  Future<void> playQueue(
+    List<Track> tracks,
+    int index, {
+    bool isPersonalPlaylist = false,
+  }) async {
+    _isPersonalPlaylist = isPersonalPlaylist;
     _queue = List.from(tracks);
     _currentIndex = index.clamp(0, tracks.length - 1);
     if (_isShuffle) _refillShuffleBag();

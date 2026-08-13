@@ -165,22 +165,33 @@ class _NyxToastOverlay extends StatelessWidget {
       top: MediaQuery.of(context).padding.top + 12,
       left: 16,
       right: 16,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOut,
-        builder: (context, t, child) => Opacity(
-          opacity: t,
-          child: Transform.translate(
-            offset: Offset(0, (1 - t) * -16),
-            child: child,
+      // Align+ConstrainedBox caps the card at 420px and centers it -- a
+      // no-op on phone widths (the cap never binds below ~450px available),
+      // but keeps it from stretching into a very wide bar on a desktop
+      // window, where left/right: 16 alone would otherwise span the whole
+      // width.
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            builder: (context, t, child) => Opacity(
+              opacity: t,
+              child: Transform.translate(
+                offset: Offset(0, (1 - t) * -16),
+                child: child,
+              ),
+            ),
+            child: NyxToast(
+              message: message,
+              icon: icon,
+              duration: duration,
+              onDismissed: onDismissed,
+            ),
           ),
-        ),
-        child: NyxToast(
-          message: message,
-          icon: icon,
-          duration: duration,
-          onDismissed: onDismissed,
         ),
       ),
     );

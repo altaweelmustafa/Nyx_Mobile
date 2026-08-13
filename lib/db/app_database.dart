@@ -2,6 +2,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import '../config.dart';
+import '../utils/artist_names.dart';
 
 /// Owns the single SQLite connection the whole app reads/writes through --
 /// tracks, playlists, playlist membership, and search history all live here.
@@ -101,6 +102,58 @@ class AppDatabase {
     // Radio stations disabled for now -- sweeps out any already seeded on an
     // existing install too, not just stopping new ones. Cheap no-op once run.
     await db.delete('tracks', where: "song = 'RADIO'");
+
+    // Real artist entities (photo/bio, synced from orc's /api/artists) --
+    // separate from track_artists below, since a track's membership under
+    // an artist name shouldn't depend on whether that artist's profile
+    // metadata has synced yet.
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS artists (
+        name       TEXT PRIMARY KEY,
+        photo_path TEXT,
+        bio        TEXT,
+        updated_at INTEGER
+      )
+    ''');
+
+    // Join table: one row per (track, individual artist) pair, so a
+    // composite credit like "Grimes & Lizzy Wizzy" shows up under both
+    // artists' pages instead of only matching that exact joined string.
+    // Deliberately not FK'd to artists.name -- see comment above.
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS track_artists (
+        track_id    INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+        artist_name TEXT NOT NULL,
+        PRIMARY KEY (track_id, artist_name)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_track_artists_name ON track_artists(artist_name)',
+    );
+    await _backfillTrackArtists(db);
+  }
+
+  /// Populates track_artists for any track that doesn't have rows yet --
+  /// covers both a fresh migration onto an existing install and any track
+  /// inserted by a code path that predates this table (shouldn't happen
+  /// going forward since TrackRepository maintains it on every
+  /// insert/upsert, but cheap and idempotent to re-check on every open).
+  Future<void> _backfillTrackArtists(Database db) async {
+    final rows = await db.rawQuery('''
+      SELECT id, artist FROM tracks
+      WHERE id NOT IN (SELECT DISTINCT track_id FROM track_artists)
+    ''');
+    for (final row in rows) {
+      final trackId = row['id'] as int;
+      final names = splitArtists(row['artist'] as String);
+      for (final name in names) {
+        await db.insert(
+          'track_artists',
+          {'track_id': trackId, 'artist_name': name},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+    }
   }
 
   /// The 6 tracks that used to ship bundled as Flutter assets now live on
@@ -186,6 +239,26 @@ class AppDatabase {
         created_at INTEGER NOT NULL
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE artists (
+        name       TEXT PRIMARY KEY,
+        photo_path TEXT,
+        bio        TEXT,
+        updated_at INTEGER
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE track_artists (
+        track_id    INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+        artist_name TEXT NOT NULL,
+        PRIMARY KEY (track_id, artist_name)
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_track_artists_name ON track_artists(artist_name)',
+    );
 
     // Single-row table -- there's only ever one local profile. google_id /
     // google_email are populated once the user signs in with Google; both

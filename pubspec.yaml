@@ -54,6 +54,7 @@ dependencies:
   sqflite_common_ffi: ^2.3.3
   share_plus: ^13.3.0
   image_picker: ^1.2.3
+  window_manager: ^0.5.2
 
 dev_dependencies:
   flutter_test:

@@ -9,11 +9,12 @@ import '../repositories/track_repository.dart';
 import '../services/audio_player_service.dart';
 import '../services/library_service.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/collection_header.dart';
 import '../widgets/nyx_toast.dart';
 import '../widgets/options_sheet.dart';
 import '../widgets/song_actions.dart';
+import '../widgets/track_row_tap.dart';
 import '../widgets/track_thumbnail.dart';
-import 'track_view_screen.dart';
 
 class PlaylistScreen extends StatefulWidget {
   final Playlist playlist;
@@ -223,13 +224,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
               ),
             ),
 
-            // ── Playlist title ─────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              child: Text(
-                _name,
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
+            // ── Playlist header ──────────────────────────────────────────
+            CollectionHeader(
+              title: _name,
+              subtitle: '${_tracks.length} TRACKS',
+              thumbnailPath: _tracks.isNotEmpty ? _tracks.first.thumbnailPath : null,
+              onPlayAll: _tracks.isEmpty
+                  ? null
+                  : () => handleTrackTap(context, _tracks, 0, isPersonalPlaylist: true),
             ),
 
             // ── Track list ─────────────────────────────────────────────────
@@ -246,17 +248,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                         final isNowPlaying = track.id == currentTrackId;
                         return GestureDetector(
                           behavior: HitTestBehavior.opaque,
-                          onTap: () {
-                            context.read<AudioPlayerService>().playQueue(
-                              _tracks,
-                              i,
-                            );
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => TrackViewScreen(track: track),
-                              ),
-                            );
-                          },
+                          onTap: () => handleTrackTap(
+                            context,
+                            _tracks,
+                            i,
+                            isPersonalPlaylist: true,
+                          ),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             child: Row(

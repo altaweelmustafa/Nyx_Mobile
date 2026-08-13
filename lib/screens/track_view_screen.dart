@@ -74,11 +74,7 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
   }
 
   Future<void> _loadWaveform(Track track) async {
-    final url = track.audioUrl;
-    final assetPath = url.startsWith('asset:///assets/')
-        ? url.replaceFirst('asset:///', '')
-        : null;
-    final bars = await WaveformService.extract(assetPath);
+    final bars = await WaveformService.extract(track.audioUrl);
     if (mounted) setState(() => _waveformBars = bars);
   }
 
@@ -490,10 +486,13 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                             _ActionButton(
                               icon: Icons.lyrics_outlined,
                               label: 'Lyrics',
+                              // `track` (svc.currentTrack ?? widget.track),
+                              // not widget.track -- this screen stays open
+                              // across playback advancing to the next
+                              // track, so widget.track can be stale.
                               onTap: () => Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) =>
-                                      LyricsScreen(track: widget.track),
+                                  builder: (_) => LyricsScreen(track: track),
                                 ),
                               ),
                             ),

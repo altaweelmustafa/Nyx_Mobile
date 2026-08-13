@@ -7,9 +7,10 @@ import '../repositories/playlist_repository.dart';
 import '../services/audio_player_service.dart';
 import '../services/library_service.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/collection_header.dart';
 import '../widgets/song_actions.dart';
+import '../widgets/track_row_tap.dart';
 import '../widgets/track_thumbnail.dart';
-import 'track_view_screen.dart';
 
 /// Liked tracks, most recently liked first -- tapping a row plays that
 /// track (with the rest of the liked list as its queue); tapping the heart
@@ -109,15 +110,14 @@ class _LikedTracksScreenState extends State<LikedTracksScreen> {
               ),
             ),
 
-            // ── Title ─────────────────────────────────────────────────────
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 8, 20, 16),
-              child: Text('Liked Tracks', style: TextStyle(
-                fontFamily: AppFonts.sans,
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              )),
+            // ── Header ────────────────────────────────────────────────────
+            CollectionHeader(
+              title: 'Liked Tracks',
+              subtitle: '${_tracks.length} TRACKS',
+              thumbnailPath: _tracks.isNotEmpty ? _tracks.first.thumbnailPath : null,
+              onPlayAll: _tracks.isEmpty
+                  ? null
+                  : () => handleTrackTap(context, _tracks, 0, isPersonalPlaylist: true),
             ),
 
             // ── Track list ─────────────────────────────────────────────────
@@ -141,14 +141,12 @@ class _LikedTracksScreenState extends State<LikedTracksScreen> {
                             final isNowPlaying = track.id == currentTrackId;
                             return GestureDetector(
                               behavior: HitTestBehavior.opaque,
-                              onTap: () {
-                                context.read<AudioPlayerService>().playQueue(_tracks, i);
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => TrackViewScreen(track: track),
-                                  ),
-                                );
-                              },
+                              onTap: () => handleTrackTap(
+                                context,
+                                _tracks,
+                                i,
+                                isPersonalPlaylist: true,
+                              ),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                                 child: Row(
