@@ -4,6 +4,34 @@ import '../models/track.dart';
 import '../services/library_service.dart';
 import '../utils/artist_names.dart';
 
+/// One track entry from the server catalog, already shaped into the fields
+/// TrackRepository.upsertManyFromCatalog needs -- CatalogSyncService owns
+/// parsing the raw JSON and building full asset URLs from it.
+class CatalogTrackInput {
+  final String slug;
+  final String title;
+  final String artist;
+  final String audioUrl;
+  final String? thumbnailPath;
+  final String? lyricsPath;
+
+  const CatalogTrackInput({
+    required this.slug,
+    required this.title,
+    required this.artist,
+    required this.audioUrl,
+    this.thumbnailPath,
+    this.lyricsPath,
+  });
+}
+
+class CatalogSyncStats {
+  final int added;
+  final int updated;
+
+  const CatalogSyncStats({required this.added, required this.updated});
+}
+
 class TrackRepository {
   Future<List<Track>> _query(String where, [List<Object?>? args]) async {
     final db = await AppDatabase.instance.database;
@@ -224,72 +252,87 @@ class TrackRepository {
     LibraryService.instance.notifyChanged();
   }
 
-  /// Inserts or updates a track by its server catalog slug. Only the
-  /// synced fields (title/artist/audio_url/thumbnail_path/lyrics_path) get
-  /// overwritten -- liked/play_count/liked_at are left alone so re-syncing
-  /// never resets local state. Returns true if this was a new track.
+  /// Inserts or updates a batch of tracks from the server catalog in one
+  /// pass. Loads every currently-synced track with a single query (instead
+  /// of one SELECT per entry) and skips the write entirely for any track
+  /// whose synced fields (title/artist/audio_url/thumbnail_path/lyrics_path)
+  /// already match -- with a large catalog, most entries on a repeat sync
+  /// are unchanged, and each skipped write also skips its
+  /// _syncTrackArtists delete+reinsert, which was the bulk of the per-track
+  /// cost. liked/play_count/liked_at are never touched, so re-syncing never
+  /// resets local state. All actual writes happen inside one transaction.
   ///
   /// Deliberately does NOT call LibraryService.notifyChanged() itself --
-  /// CatalogSyncService calls this once per track in a loop, and firing a
-  /// notification per track would spam every listening screen with a
-  /// reload mid-sync. CatalogSyncService notifies once after the whole
-  /// sync (upserts + deleteMissingFromCatalog) finishes instead.
-  Future<bool> upsertFromCatalog({
-    required String slug,
-    required String title,
-    required String artist,
-    required String audioUrl,
-    String? thumbnailPath,
-    String? lyricsPath,
-    String song = 'SONG',
-  }) async {
+  /// CatalogSyncService notifies once after the whole sync (this +
+  /// deleteMissingFromCatalog) finishes, not per track.
+  Future<CatalogSyncStats> upsertManyFromCatalog(List<CatalogTrackInput> entries) async {
     final db = await AppDatabase.instance.database;
-    final existing = await db.query(
+    final existingRows = await db.query(
       'tracks',
-      where: 'slug = ?',
-      whereArgs: [slug],
-      limit: 1,
+      columns: ['id', 'slug', 'title', 'artist', 'audio_url', 'thumbnail_path', 'lyrics_path'],
+      where: 'slug IS NOT NULL',
     );
+    final bySlug = {for (final row in existingRows) row['slug'] as String: row};
 
-    if (existing.isEmpty) {
-      final id = await db.insert('tracks', {
-        'title': title,
-        'artist': artist,
-        'song': song,
-        'audio_url': audioUrl,
-        'thumbnail_path': thumbnailPath,
-        'lyrics_path': lyricsPath,
-        'slug': slug,
-        'liked': 0,
-        'created_at': DateTime.now().millisecondsSinceEpoch,
-      });
-      await _syncTrackArtists(db, id, artist);
-      return true;
-    }
+    var added = 0;
+    var updated = 0;
 
-    final id = existing.first['id'] as int;
-    await db.update(
-      'tracks',
-      {
-        'title': title,
-        'artist': artist,
-        'audio_url': audioUrl,
-        'thumbnail_path': thumbnailPath,
-        'lyrics_path': lyricsPath,
-      },
-      where: 'slug = ?',
-      whereArgs: [slug],
-    );
-    await _syncTrackArtists(db, id, artist);
-    return false;
+    await db.transaction((txn) async {
+      for (final entry in entries) {
+        final existing = bySlug[entry.slug];
+
+        if (existing == null) {
+          final id = await txn.insert('tracks', {
+            'title': entry.title,
+            'artist': entry.artist,
+            'song': 'SONG',
+            'audio_url': entry.audioUrl,
+            'thumbnail_path': entry.thumbnailPath,
+            'lyrics_path': entry.lyricsPath,
+            'slug': entry.slug,
+            'liked': 0,
+            'created_at': DateTime.now().millisecondsSinceEpoch,
+          });
+          await _syncTrackArtists(txn, id, entry.artist);
+          added++;
+          continue;
+        }
+
+        final unchanged = existing['title'] == entry.title &&
+            existing['artist'] == entry.artist &&
+            existing['audio_url'] == entry.audioUrl &&
+            existing['thumbnail_path'] == entry.thumbnailPath &&
+            existing['lyrics_path'] == entry.lyricsPath;
+        if (unchanged) continue;
+
+        final id = existing['id'] as int;
+        await txn.update(
+          'tracks',
+          {
+            'title': entry.title,
+            'artist': entry.artist,
+            'audio_url': entry.audioUrl,
+            'thumbnail_path': entry.thumbnailPath,
+            'lyrics_path': entry.lyricsPath,
+          },
+          where: 'slug = ?',
+          whereArgs: [entry.slug],
+        );
+        await _syncTrackArtists(txn, id, entry.artist);
+        updated++;
+      }
+    });
+
+    return CatalogSyncStats(added: added, updated: updated);
   }
 
   /// Replaces track_artists for [trackId] with a fresh split of [artist] --
   /// called on every write to `tracks` that can change its artist column,
   /// so "which artist pages include this track" always matches the current
   /// credit. Delete-then-reinsert rather than diffing, since this table is
-  /// tiny per track.
-  Future<void> _syncTrackArtists(Database db, int trackId, String artist) async {
+  /// tiny per track. Takes a DatabaseExecutor (not just Database) so it can
+  /// run inside a transaction as well as standalone.
+  Future<void> _syncTrackArtists(DatabaseExecutor db, int trackId, String artist) async {
     await db.delete('track_artists', where: 'track_id = ?', whereArgs: [trackId]);
     for (final name in splitArtists(artist)) {
       await db.insert(

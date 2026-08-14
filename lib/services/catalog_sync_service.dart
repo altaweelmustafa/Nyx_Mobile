@@ -32,17 +32,14 @@ class CatalogSyncService {
     final response = await _dio.get<Map<String, dynamic>>('$url/api/catalog');
     final tracks = ((response.data?['tracks'] as List?) ?? []).cast<Map<String, dynamic>>();
 
-    var added = 0;
-    var updated = 0;
     final catalogSlugs = <String>{};
-    for (final entry in tracks) {
+    final entries = tracks.map((entry) {
       final slug = entry['slug'] as String;
       final audioPath = entry['audio_path'] as String;
       final thumbnailPath = entry['thumbnail_path'] as String?;
       final lyricsPath = entry['lyrics_path'] as String?;
       catalogSlugs.add(slug);
-
-      final isNew = await _trackRepo.upsertFromCatalog(
+      return CatalogTrackInput(
         slug: slug,
         title: entry['title'] as String,
         artist: entry['artist'] as String,
@@ -50,24 +47,23 @@ class CatalogSyncService {
         thumbnailPath: thumbnailPath != null ? '$url/assets/$thumbnailPath' : null,
         lyricsPath: lyricsPath != null ? '$url/assets/$lyricsPath' : null,
       );
-      if (isNew) {
-        added++;
-      } else {
-        updated++;
-      }
-    }
+    }).toList();
+
+    // Single batched pass: one read of everything already synced, one
+    // transaction for the writes, and any track whose fields already match
+    // is skipped entirely -- only genuinely new/changed tracks get written.
+    final stats = await _trackRepo.upsertManyFromCatalog(entries);
 
     final removed = await _trackRepo.deleteMissingFromCatalog(catalogSlugs);
 
     await _syncArtists(url);
 
-    // One notification for the whole sync, not per track -- see
-    // upsertFromCatalog's doc comment for why it doesn't notify itself.
-    if (added > 0 || updated > 0 || removed > 0) {
+    // One notification for the whole sync, not per track.
+    if (stats.added > 0 || stats.updated > 0 || removed > 0) {
       LibraryService.instance.notifyChanged();
     }
 
-    return SyncResult(total: tracks.length, added: added, updated: updated, removed: removed);
+    return SyncResult(total: tracks.length, added: stats.added, updated: stats.updated, removed: removed);
   }
 
   /// Pulls orc's artist photo/bio registry (GET /api/artists) and mirrors
