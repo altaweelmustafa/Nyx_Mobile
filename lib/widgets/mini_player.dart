@@ -59,10 +59,13 @@ class _MiniPlayerState extends State<MiniPlayer> {
           children: [
             Row(
               children: [
-                TrackThumbnail(
-                  size: 34,
-                  assetPath: track.thumbnailPath,
-                  borderRadius: 6,
+               Hero(
+                  tag: 'track-art-${track.id}',
+                  child: TrackThumbnail(
+                    size: 34,
+                    assetPath: track.thumbnailPath,
+                    borderRadius: 6,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -121,10 +124,16 @@ class _MiniPlayerState extends State<MiniPlayer> {
                             strokeWidth: 2,
                           ),
                         )
-                      : Icon(
-                          svc.isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: AppColors.textPrimary,
-                          size: 26,
+                      : AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          transitionBuilder: (child, anim) =>
+                              ScaleTransition(scale: anim, child: child),
+                          child: Icon(
+                            svc.isPlaying ? Icons.pause : Icons.play_arrow,
+                            key: ValueKey(svc.isPlaying),
+                            color: AppColors.textPrimary,
+                            size: 26,
+                          ),
                         ),
                 ),
                 const SizedBox(width: 8),

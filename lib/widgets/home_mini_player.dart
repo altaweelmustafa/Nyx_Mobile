@@ -55,11 +55,12 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
             ),
             child: Stack(
               children: [
-                if (track.thumbnailPath case final path?)
-                  Positioned.fill(
+               if (track.thumbnailPath case final path?)
+                Positioned.fill(
+                  child: Hero(
+                    tag: 'track-art-${track.id}',
                     child:
-                        path.startsWith('http://') ||
-                            path.startsWith('https://')
+                        path.startsWith('http://') || path.startsWith('https://')
                         ? CachedNetworkImage(
                             imageUrl: path,
                             fit: BoxFit.cover,
@@ -73,7 +74,7 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
                                 Container(color: AppColors.surfaceHigh),
                           ),
                   ),
-
+                ),
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
@@ -238,6 +239,11 @@ class _Btn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
-    child: Icon(icon, color: color, size: size),
+    child: AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      transitionBuilder: (child, anim) =>
+          ScaleTransition(scale: anim, child: child),
+      child: Icon(icon, key: ValueKey(icon), color: color, size: size),
+    ),
   );
 }

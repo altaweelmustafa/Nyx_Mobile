@@ -46,12 +46,32 @@ class _ShellScreenState extends State<ShellScreen> {
     }
   }
 
-  void _openPlayer() {
+ void _openPlayer() {
     final track = context.read<AudioPlayerService>().currentTrack;
     if (track == null) return;
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => TrackViewScreen(track: track)));
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 320),
+        reverseTransitionDuration: const Duration(milliseconds: 260),
+        pageBuilder: (_, __, ___) => TrackViewScreen(track: track),
+        transitionsBuilder: (_, animation, __, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.05),
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _openProfile() {
@@ -333,14 +353,21 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = isSelected ? AppColors.textPrimary : AppColors.textSecondary;
     return GestureDetector(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.all(8),
-        child: Icon(
-          icon,
-          color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
-          size: 26,
+        child: AnimatedScale(
+          scale: isSelected ? 1.15 : 1.0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          child: TweenAnimationBuilder<Color?>(
+            tween: ColorTween(end: color),
+            duration: const Duration(milliseconds: 200),
+            builder: (context, animatedColor, child) =>
+                Icon(icon, color: animatedColor, size: 26),
+          ),
         ),
       ),
     );

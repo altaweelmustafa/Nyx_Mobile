@@ -245,14 +245,17 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                           const SizedBox(height: 24),
 
                           // ── Album art ────────────────────────────────────────────────────
-                          Padding(
+                         Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 40),
                             child: AspectRatio(
                               aspectRatio: 1,
-                              child: TrackThumbnail(
-                                size: double.infinity,
-                                assetPath: track.thumbnailPath,
-                                borderRadius: 12,
+                              child: Hero(
+                                tag: 'track-art-${track.id}',
+                                child: TrackThumbnail(
+                                  size: double.infinity,
+                                  assetPath: track.thumbnailPath,
+                                  borderRadius: 12,
+                                ),
                               ),
                             ),
                           ),
@@ -450,12 +453,23 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                                                       strokeWidth: 2.5,
                                                     ),
                                               )
-                                            : Icon(
-                                                svc.isPlaying
-                                                    ? Icons.pause
-                                                    : Icons.play_arrow,
-                                                color: AppColors.background,
-                                                size: 32,
+                                            : AnimatedSwitcher(
+                                                duration: const Duration(
+                                                  milliseconds: 200,
+                                                ),
+                                                transitionBuilder: (child, anim) =>
+                                                    ScaleTransition(
+                                                      scale: anim,
+                                                      child: child,
+                                                    ),
+                                                child: Icon(
+                                                  svc.isPlaying
+                                                      ? Icons.pause
+                                                      : Icons.play_arrow,
+                                                  key: ValueKey(svc.isPlaying),
+                                                  color: AppColors.background,
+                                                  size: 32,
+                                                ),
                                               ),
                                       ),
                                     ),
