@@ -7,6 +7,7 @@ import '../repositories/track_repository.dart';
 import '../services/library_service.dart';
 import '../widgets/nyx_toast.dart';
 import '../widgets/track_thumbnail.dart';
+import 'history_screen.dart';
 import 'liked_tracks_screen.dart';
 import 'playlist_screen.dart';
 
@@ -134,6 +135,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
     _load();
   }
 
+  Future<void> _openHistory() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
+    _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -155,6 +163,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           child: Text(
                             'Your Library',
                             style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'History',
+                          onPressed: _openHistory,
+                          icon: const Icon(
+                            Icons.history,
+                            color: AppColors.textPrimary,
+                            size: 24,
                           ),
                         ),
                         IconButton(

@@ -21,6 +21,23 @@ class BluetoothDeviceInfo {
     }
   }
 
+  /// Maps a BlueZ org.bluez.Device1 `Icon` property (freedesktop icon
+  /// naming spec names, e.g. "audio-headphones", "audio-card") to our
+  /// device type.
+  static BtDeviceType typeFromBluezIcon(String? icon) {
+    switch (icon) {
+      case 'audio-headphones':
+      case 'audio-headset':
+        return BtDeviceType.headphones;
+      case 'car':
+        return BtDeviceType.car;
+      case 'audio-card':
+        return BtDeviceType.speaker;
+      default:
+        return BtDeviceType.unknown;
+    }
+  }
+
   IconData get icon {
     switch (type) {
       case BtDeviceType.headphones:

@@ -72,6 +72,37 @@ class TrackRepository {
     return rows.map(Track.fromMap).toList();
   }
 
+  /// Most recently played first, for the History screen.
+  Future<List<Track>> getRecentlyPlayed() async {
+    final db = await AppDatabase.instance.database;
+    final rows = await db.query(
+      'tracks',
+      where: "song != 'RADIO' AND last_played_at IS NOT NULL",
+      orderBy: 'last_played_at DESC',
+    );
+    return rows.map(Track.fromMap).toList();
+  }
+
+  /// Drops [id] out of the History list without touching play_count or
+  /// liked state -- "remove from history" just clears when it was last
+  /// played, it's not the same as removing the track from the library.
+  Future<void> clearHistoryEntry(String id) async {
+    final db = await AppDatabase.instance.database;
+    await db.update(
+      'tracks',
+      {'last_played_at': null},
+      where: 'id = ?',
+      whereArgs: [int.parse(id)],
+    );
+    LibraryService.instance.notifyChanged();
+  }
+
+  Future<void> clearAllHistory() async {
+    final db = await AppDatabase.instance.database;
+    await db.update('tracks', {'last_played_at': null});
+    LibraryService.instance.notifyChanged();
+  }
+
   /// Most recently added tracks -- "new releases" in the absence of a real
   /// release-date field.
   Future<List<Track>> getNewReleases(int limit) async {

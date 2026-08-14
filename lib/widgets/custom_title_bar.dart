@@ -52,46 +52,60 @@ class _CustomTitleBarState extends State<CustomTitleBar> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 36,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.divider)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: DragToMoveArea(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 16),
-                child: const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'NYX',
-                    style: TextStyle(
-                      fontFamily: AppFonts.mono,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 2,
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        height: 36,
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(bottom: BorderSide(color: AppColors.divider)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: DragToMoveArea(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 16),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Image.asset(
+                          'assets/icons/nyx_logo.png',
+                          width: 18,
+                          height: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'NYX',
+                          style: TextStyle(
+                            fontFamily: AppFonts.mono,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textSecondary,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-          _TitleBarButton(icon: Icons.remove, onTap: () => windowManager.minimize()),
-          _TitleBarButton(
-            icon: _isMaximized ? Icons.filter_none : Icons.crop_square,
-            iconSize: _isMaximized ? 13 : 14,
-            onTap: _toggleMaximize,
-          ),
-          _TitleBarButton(
-            icon: Icons.close,
-            onTap: () => windowManager.close(),
-            hoverColor: const Color(0xFFE81123),
-          ),
-        ],
+            _TitleBarButton(icon: Icons.remove, onTap: () => windowManager.minimize()),
+            _TitleBarButton(
+              icon: _isMaximized ? Icons.filter_none : Icons.crop_square,
+              iconSize: _isMaximized ? 13 : 14,
+              onTap: _toggleMaximize,
+            ),
+            _TitleBarButton(
+              icon: Icons.close,
+              onTap: () => windowManager.close(),
+              hoverColor: const Color(0xFFE81123),
+            ),
+          ],
+        ),
       ),
     );
   }
