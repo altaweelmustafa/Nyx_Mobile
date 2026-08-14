@@ -87,36 +87,47 @@ class _ShellScreenState extends State<ShellScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          // ── Page content ──────────────────────────────────────────────────
-          _screens[_currentIndex],
+    // On the phone/tablet shell, back should feel like navigating the app,
+    // not exiting it: if you're on any tab other than Home, back takes you
+    // to Home first. Only pressing back while already on Home actually
+    // pops the shell (i.e. exits), matching normal Android expectations.
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        setState(() => _currentIndex = 0);
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Stack(
+          children: [
+            // ── Page content ──────────────────────────────────────────────
+            _screens[_currentIndex],
 
-          // ── Mini player + bottom nav ───────────────────────────────────────
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Home tab → full PDF-style card
-                // All other tabs → compact pill player
-                if (_currentIndex == 0)
-                  HomeMiniPlayer(onTap: _openPlayer)
-                else
-                  MiniPlayer(onTap: _openPlayer),
-                _BottomNav(
-                  currentIndex: _currentIndex,
-                  onTap: (i) => setState(() => _currentIndex = i),
-                  onProfileTap: _openProfile,
-                ),
-              ],
+            // ── Mini player + bottom nav ─────────────────────────────────
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Home tab → full PDF-style card
+                  // All other tabs → compact pill player
+                  if (_currentIndex == 0)
+                    HomeMiniPlayer(onTap: _openPlayer)
+                  else
+                    MiniPlayer(onTap: _openPlayer),
+                  _BottomNav(
+                    currentIndex: _currentIndex,
+                    onTap: (i) => setState(() => _currentIndex = i),
+                    onProfileTap: _openProfile,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
