@@ -252,6 +252,13 @@ class TrackRepository {
     return rows.isEmpty ? null : rows.first;
   }
 
+  /// Resolves a shared track link's slug (see DeepLinkService) back to a
+  /// local Track. Locally-added tracks have no slug and are never matched.
+  Future<Track?> getBySlug(String slug) async {
+    final rows = await _query('slug = ?', [slug]);
+    return rows.isEmpty ? null : rows.first;
+  }
+
   Future<void> deleteTrack(String id) async {
     final db = await AppDatabase.instance.database;
     await db.delete('tracks', where: 'id = ?', whereArgs: [int.parse(id)]);

@@ -49,6 +49,21 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Song-share links (see DeepLinkService / kDefaultServerUrl):
+                 http://100.105.90.110:8086/t/<slug>. Not autoVerify'd, since
+                 that needs HTTPS plus a verified domain and the homelab has
+                 neither, so tapping one shows an "Open with" chooser the
+                 first time; picking Nyx and "Always" makes it silent after. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="http"
+                    android:host="100.105.90.110"
+                    android:port="8086"
+                    android:pathPrefix="/t"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

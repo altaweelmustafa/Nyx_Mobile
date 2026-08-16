@@ -10,13 +10,26 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:window_manager/window_manager.dart';
 import 'theme/app_theme.dart';
+import 'models/track.dart';
 import 'screens/start_screen.dart';
+import 'screens/track_view_screen.dart';
 import 'services/audio_player_service.dart';
 import 'services/bluetooth_route_service.dart';
+import 'services/deep_link_service.dart';
 import 'services/jam_service.dart';
 import 'services/library_service.dart';
 import 'services/nyx_audio_handler.dart';
 import 'widgets/custom_title_bar.dart';
+
+/// Lets DeepLinkService (and StartScreen, for the cold-start link) push a
+/// screen without needing a BuildContext of their own.
+final navigatorKey = GlobalKey<NavigatorState>();
+
+void pushSharedTrack(Track track) {
+  navigatorKey.currentState?.push(
+    MaterialPageRoute(builder: (_) => TrackViewScreen(track: track)),
+  );
+}
 
 /// window_manager only has real desktop implementations on these three --
 /// on Android/iOS it's a no-op window concept that doesn't apply.
@@ -127,6 +140,10 @@ void main() async {
     });
   }
 
+  // Links tapped while the app is already running (cold-start links are
+  // handled separately by StartScreen, after the tailnet gate clears).
+  DeepLinkService.instance.trackStream.listen(pushSharedTrack);
+
   runApp(
     MultiProvider(
       providers: [
@@ -147,6 +164,7 @@ class BragerApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Nyx',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       // `builder` wraps every route the Navigator ever pushes (not just

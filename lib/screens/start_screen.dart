@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../main.dart' show pushSharedTrack;
+import '../services/deep_link_service.dart';
 import '../services/tailnet_service.dart';
 import '../theme/app_theme.dart';
 import 'shell_screen.dart';
@@ -36,10 +38,20 @@ class _StartScreenState extends State<StartScreen> {
     if (connected) _navigate();
   }
 
-  void _navigate() {
+  void _navigate() async {
+    // Note: pushReplacement's returned Future only completes once
+    // ShellScreen itself is later popped, not once the transition to it has
+    // started -- don't await it here.
     Navigator.of(
       context,
     ).pushReplacement(MaterialPageRoute(builder: (_) => const ShellScreen()));
+
+    // If the app was launched by tapping a shared song link, land on it
+    // once the tailnet gate has cleared and Shell is showing underneath --
+    // pushing straight from here (rather than from a bare StatelessWidget
+    // at app startup) means Back goes to Shell, not to this splash screen.
+    final track = await DeepLinkService.instance.takeInitialTrack();
+    if (track != null) pushSharedTrack(track);
   }
 
   @override

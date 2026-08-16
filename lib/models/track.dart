@@ -7,6 +7,7 @@ class Track {
   final String? thumbnailPath; // 'assets/images/x.jpg' (bundled) or a full http(s) URL (server-hosted)
   final String? lyricsPath; // 'assets/lyrics/x.lrc' (bundled) or a full http(s) URL (server-hosted)
   final bool liked;
+  final String? slug; // server-catalog identity used for share links; null for locally-added tracks
 
   const Track({
     required this.id,
@@ -17,6 +18,7 @@ class Track {
     this.thumbnailPath,
     this.lyricsPath,
     this.liked = false,
+    this.slug,
   });
 
   factory Track.fromMap(Map<String, Object?> map) => Track(
@@ -28,6 +30,7 @@ class Track {
     thumbnailPath: map['thumbnail_path'] as String?,
     lyricsPath: map['lyrics_path'] as String?,
     liked: (map['liked'] as int) != 0,
+    slug: map['slug'] as String?,
   );
 
   Track copyWith({bool? liked}) => Track(
@@ -39,5 +42,6 @@ class Track {
     thumbnailPath: thumbnailPath,
     lyricsPath: lyricsPath,
     liked: liked ?? this.liked,
+    slug: slug,
   );
 }

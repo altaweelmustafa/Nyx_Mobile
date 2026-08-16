@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../config.dart';
 import '../theme/app_theme.dart';
 import '../models/track.dart';
 import '../repositories/playlist_repository.dart';
@@ -102,8 +103,15 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
   }
 
   void _share(Track track) {
+    final caption = '${track.title} — ${track.artist}';
+    // Locally-added tracks (never synced from orc) have no slug, so there's
+    // no stable id to build a link from -- share the caption alone rather
+    // than a link that would 404 for the recipient.
+    final slug = track.slug;
     SharePlus.instance.share(
-      ShareParams(text: '${track.title} — ${track.artist}'),
+      ShareParams(
+        text: slug == null ? caption : '$caption\n$kDefaultServerUrl/t/$slug',
+      ),
     );
   }
 
