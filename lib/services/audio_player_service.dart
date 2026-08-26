@@ -382,10 +382,34 @@ class AudioPlayerService extends ChangeNotifier {
     await seek(Duration(milliseconds: ms));
   }
 
+  /// Seeks relative to the current position, clamped to the track's bounds
+  /// -- shared by the desktop left/right-arrow shortcuts and the Android
+  /// notification/lock-screen rewind/fast-forward buttons.
+  Future<void> seekBy(Duration delta) async {
+    var target = _position + delta;
+    if (target < Duration.zero) target = Duration.zero;
+    if (_duration > Duration.zero && target > _duration) target = _duration;
+    await seek(target);
+  }
+
   Future<void> setVolume(double volume) async {
     _volume = volume.clamp(0.0, 1.0);
     await _player.setVolume(_volume);
     notifyListeners();
+  }
+
+  // Remembers the level to restore to when un-muting, so muting then
+  // un-muting (via the volume icon or the desktop M shortcut) gets back to
+  // where you were instead of jumping to 100%.
+  double _preMuteVolume = 1.0;
+
+  Future<void> toggleMute() async {
+    if (_volume > 0) {
+      _preMuteVolume = _volume;
+      await setVolume(0);
+    } else {
+      await setVolume(_preMuteVolume > 0 ? _preMuteVolume : 1.0);
+    }
   }
 
   void toggleShuffle() {

@@ -25,19 +25,6 @@ class VolumeControl extends StatefulWidget {
 }
 
 class _VolumeControlState extends State<VolumeControl> {
-  // Remembers the level to restore to when un-muting, so tapping the icon
-  // twice gets you back to where you were instead of jumping to 100%.
-  double _preMuteVolume = 1.0;
-
-  void _toggleMute(AudioPlayerService svc) {
-    if (svc.volume > 0) {
-      _preMuteVolume = svc.volume;
-      svc.setVolume(0);
-    } else {
-      svc.setVolume(_preMuteVolume > 0 ? _preMuteVolume : 1.0);
-    }
-  }
-
   IconData _iconFor(double volume) {
     if (volume <= 0) return Icons.volume_off;
     if (volume < 0.5) return Icons.volume_down;
@@ -52,7 +39,7 @@ class _VolumeControlState extends State<VolumeControl> {
       mainAxisSize: MainAxisSize.min,
       children: [
         GestureDetector(
-          onTap: () => _toggleMute(svc),
+          onTap: svc.toggleMute,
           child: Icon(_iconFor(svc.volume), size: 18, color: widget.iconColor),
         ),
         const SizedBox(width: 6),

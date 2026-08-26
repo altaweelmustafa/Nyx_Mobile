@@ -20,6 +20,7 @@ import 'services/jam_service.dart';
 import 'services/library_service.dart';
 import 'services/nyx_audio_handler.dart';
 import 'widgets/custom_title_bar.dart';
+import 'widgets/desktop_shortcuts.dart';
 
 /// Lets DeepLinkService (and StartScreen, for the cold-start link) push a
 /// screen without needing a BuildContext of their own.
@@ -173,11 +174,13 @@ class BragerApp extends StatelessWidget {
       // the first screen.
       builder: !_isDesktopPlatform
           ? null
-          : (context, child) => Column(
-                children: [
-                  const CustomTitleBar(),
-                  Expanded(child: child ?? const SizedBox.shrink()),
-                ],
+          : (context, child) => DesktopShortcuts(
+                child: Column(
+                  children: [
+                    const CustomTitleBar(),
+                    Expanded(child: child ?? const SizedBox.shrink()),
+                  ],
+                ),
               ),
       home: const StartScreen(),
     );

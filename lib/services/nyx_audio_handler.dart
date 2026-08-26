@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
@@ -23,6 +24,16 @@ class NyxAudioHandler extends BaseAudioHandler with SeekHandler {
   bool? _lastLoading;
   DateTime? _lastBroadcastAt;
   Duration? _lastBroadcastPosition;
+
+  // A plain headset/earbud remote button (wired or single-button Bluetooth)
+  // only ever reports a generic "media" click, with no way to tell single
+  // from double from triple -- so we count clicks ourselves within a short
+  // window, matching the convention most earbuds' own inline mics assume:
+  // 1 click = play/pause, 2 = next, 3+ = previous.
+  int _clickCount = 0;
+  Timer? _clickTimer;
+  static const _clickWindow = Duration(milliseconds: 400);
+  static const _seekStep = Duration(seconds: 10);
 
   NyxAudioHandler(this._service) {
     _service.addListener(_sync);
@@ -96,13 +107,22 @@ class NyxAudioHandler extends BaseAudioHandler with SeekHandler {
     _lastBroadcastPosition = _service.position;
     playbackState.add(
       playbackState.value.copyWith(
+        // Rewind/fast-forward ride along as expanded-notification-only
+        // actions -- the compact indices below keep prev/play-pause/next as
+        // the 3 buttons shown collapsed, same as before.
         controls: [
+          MediaControl.rewind,
           MediaControl.skipToPrevious,
           playing ? MediaControl.pause : MediaControl.play,
           MediaControl.skipToNext,
+          MediaControl.fastForward,
         ],
-        systemActions: const {MediaAction.seek},
-        androidCompactActionIndices: const [0, 1, 2],
+        systemActions: const {
+          MediaAction.seek,
+          MediaAction.fastForward,
+          MediaAction.rewind,
+        },
+        androidCompactActionIndices: const [1, 2, 3],
         playing: playing,
         processingState: _service.isLoading
             ? AudioProcessingState.loading
@@ -166,6 +186,36 @@ class NyxAudioHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> skipToPrevious() => _service.playPrevious();
+
+  @override
+  Future<void> fastForward() => _service.seekBy(_seekStep);
+
+  @override
+  Future<void> rewind() => _service.seekBy(-_seekStep);
+
+  /// A device that reports genuinely distinct next/previous buttons (some
+  /// 3-button Bluetooth remotes) still gets those directly -- only a plain
+  /// "media" click goes through the click-counting below.
+  @override
+  Future<void> click([MediaButton button = MediaButton.media]) async {
+    if (button != MediaButton.media) {
+      return super.click(button);
+    }
+
+    _clickCount++;
+    _clickTimer?.cancel();
+    _clickTimer = Timer(_clickWindow, () {
+      switch (_clickCount) {
+        case 1:
+          _service.togglePlayPause();
+        case 2:
+          _service.playNext();
+        default: // 3 or more
+          _service.playPrevious();
+      }
+      _clickCount = 0;
+    });
+  }
 
   @override
   Future<void> stop() async {
