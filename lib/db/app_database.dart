@@ -69,6 +69,13 @@ class AppDatabase {
     if (!hasLiked) {
       await db.execute('ALTER TABLE playlists ADD COLUMN liked INTEGER NOT NULL DEFAULT 1');
     }
+    // Non-null only for a playlist saved from an artist page ("Save as
+    // Playlist") -- a fixed snapshot of that artist's tracks at save time,
+    // named after the artist and locked from further edits.
+    final hasSourceArtist = playlistColumns.any((c) => c['name'] == 'source_artist');
+    if (!hasSourceArtist) {
+      await db.execute('ALTER TABLE playlists ADD COLUMN source_artist TEXT');
+    }
 
     final trackColumns = await db.rawQuery("PRAGMA table_info('tracks')");
     final trackColumnNames = trackColumns.map((c) => c['name']).toSet();
@@ -215,11 +222,12 @@ class AppDatabase {
 
     await db.execute('''
       CREATE TABLE playlists (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        name       TEXT NOT NULL,
-        likes      INTEGER NOT NULL DEFAULT 0,
-        liked      INTEGER NOT NULL DEFAULT 1,
-        created_at INTEGER NOT NULL
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        name          TEXT NOT NULL,
+        likes         INTEGER NOT NULL DEFAULT 0,
+        liked         INTEGER NOT NULL DEFAULT 1,
+        source_artist TEXT,
+        created_at    INTEGER NOT NULL
       )
     ''');
 

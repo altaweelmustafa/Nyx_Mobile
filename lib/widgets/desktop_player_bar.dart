@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import '../services/artwork_color_service.dart';
 import '../services/audio_player_service.dart';
 import '../theme/app_theme.dart';
+import 'artist_label.dart';
 import 'bluetooth_indicator.dart';
 import 'loop_mode_button.dart';
 import 'track_thumbnail.dart';
+import 'volume_control.dart';
 import 'waveform_scrubber.dart';
 
 /// Full-width playback bar pinned to the bottom of the window on desktop
@@ -84,10 +86,9 @@ class _DesktopPlayerBarState extends State<DesktopPlayerBar> {
                     ),
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    track.artist,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ArtistLabel(
+                    artist: track.artist,
+                    thumbnailPath: track.thumbnailPath,
                     style: const TextStyle(
                       fontFamily: AppFonts.sans,
                       fontFamilyFallback: AppFonts.fallback,
@@ -186,6 +187,8 @@ class _DesktopPlayerBarState extends State<DesktopPlayerBar> {
               fontSize: 11,
               nameWidth: 140,
             ),
+            const SizedBox(width: 20),
+            const VolumeControl(),
           ],
         ),
       ),

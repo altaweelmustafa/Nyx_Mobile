@@ -5,6 +5,7 @@ import '../models/track.dart';
 import '../repositories/search_history_repository.dart';
 import '../repositories/track_repository.dart';
 import '../services/audio_player_service.dart';
+import '../widgets/artist_label.dart';
 import '../widgets/track_row_tap.dart';
 import '../widgets/track_thumbnail.dart';
 import 'artist_screen.dart';
@@ -439,8 +440,9 @@ class _ResultsList extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            track.artist,
+                          ArtistLabel(
+                            artist: track.artist,
+                            thumbnailPath: track.thumbnailPath,
                             style: const TextStyle(
                               fontFamily: AppFonts.sans,
                               fontSize: 12,

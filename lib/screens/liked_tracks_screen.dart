@@ -7,6 +7,7 @@ import '../repositories/playlist_repository.dart';
 import '../services/audio_player_service.dart';
 import '../services/library_service.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/artist_label.dart';
 import '../widgets/collection_header.dart';
 import '../widgets/song_actions.dart';
 import '../widgets/track_row_tap.dart';
@@ -167,8 +168,9 @@ class _LikedTracksScreenState extends State<LikedTracksScreen> {
                                             ),
                                           ),
                                           const SizedBox(height: 3),
-                                          Text(
-                                            track.artist,
+                                          ArtistLabel(
+                                            artist: track.artist,
+                                            thumbnailPath: track.thumbnailPath,
                                             style: const TextStyle(
                                               fontFamily: AppFonts.sans,
                                               fontSize: 12,

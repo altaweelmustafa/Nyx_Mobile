@@ -37,13 +37,19 @@ class AudioPlayerService extends ChangeNotifier {
   List<Track> _queue        = [];
   int             _currentIndex = -1;
 
-  // Shuffle-bag: indices not yet played in the current pass through the
-  // queue. Drained one at a time so every track plays once before any
-  // repeats; refilled (excluding the just-finished track) once empty.
-  List<int> _shuffleBag = [];
+  // Shuffle order: a fixed permutation of _queue indices for the current
+  // pass, with _shufflePos pointing at where _currentIndex sits within it.
+  // Unlike re-rolling a random index on every skip, this is generated once
+  // per pass and walked forward/backward -- so "previous" during shuffle
+  // actually retraces shuffled play history instead of landing on an
+  // unrelated track, and repeated next/prev never reshuffles mid-pass.
+  List<int> _shuffleOrder = [];
+  int _shufflePos = -1;
 
   // True while a track-to-track transition is in flight; blocks spurious completed events.
   bool _isAdvancing = false;
+
+  double _volume = 1.0;
 
   // ── Public getters ─────────────────────────────────────────────────────────
   Track? get currentTrack => _currentTrack;
@@ -53,6 +59,7 @@ class AudioPlayerService extends ChangeNotifier {
   bool       get isLoading    => _isLoading;
   Duration   get position     => _position;
   Duration   get duration     => _duration;
+  double     get volume       => _volume;
 
   double get progress {
     if (_duration.inMilliseconds == 0) return 0.0;
@@ -103,7 +110,7 @@ class AudioPlayerService extends ChangeNotifier {
 
       case LoopMode.none:
         final atEnd = _isShuffle
-            ? _shuffleBag.isEmpty
+            ? _shufflePos >= _shuffleOrder.length - 1
             : _currentIndex >= _queue.length - 1;
         if (!atEnd) {
           _isAdvancing = true;
@@ -143,9 +150,14 @@ class AudioPlayerService extends ChangeNotifier {
     final insertedAt = _queue.length;
     _queue.addAll(more);
     if (_isShuffle) {
-      _shuffleBag = [for (int i = 0; i < more.length; i++) insertedAt + i];
-      _shuffleBag.shuffle(_rng);
-      _currentIndex = _shuffleBag.removeLast();
+      // Extend the current shuffled pass rather than starting a new one --
+      // the new tracks join the tail of the order, freshly shuffled among
+      // themselves, and playback moves one step forward into them.
+      final newIndices = [for (int i = 0; i < more.length; i++) insertedAt + i];
+      newIndices.shuffle(_rng);
+      _shuffleOrder.addAll(newIndices);
+      _shufflePos++;
+      _currentIndex = _shuffleOrder[_shufflePos];
     } else {
       _currentIndex = insertedAt;
     }
@@ -168,7 +180,7 @@ class AudioPlayerService extends ChangeNotifier {
     } else {
       _currentIndex = existingIndex;
     }
-    if (_isShuffle) _refillShuffleBag();
+    if (_isShuffle) _startNewShufflePass();
 
     await _loadAndPlay(track);
   }
@@ -184,20 +196,36 @@ class AudioPlayerService extends ChangeNotifier {
     _isPersonalPlaylist = isPersonalPlaylist;
     _queue = List.from(tracks);
     _currentIndex = index.clamp(0, tracks.length - 1);
-    if (_isShuffle) _refillShuffleBag();
+    if (_isShuffle) _startNewShufflePass();
     await _loadAndPlay(_queue[_currentIndex]);
   }
 
   /// Skip forward — always wraps around to the start when on the last track.
   Future<void> playNext() => _advanceQueue(wrap: true);
 
-  /// Skip backward — restarts current track if >3 s in, otherwise wraps to end.
+  /// Skip backward — restarts current track if >3 s in, otherwise steps back
+  /// one track. In shuffle mode this retraces the shuffled order (the same
+  /// sequence "next" walks forward through) rather than the queue's
+  /// original order, so it always lands on whatever actually played before.
   Future<void> playPrevious() async {
     if (_queue.isEmpty) return;
     if (_position.inSeconds > 3) {
       await _player.seek(Duration.zero);
       return;
     }
+
+    if (_isShuffle && _shuffleOrder.isNotEmpty) {
+      if (_shuffleOrder.length <= 1) {
+        await _player.seek(Duration.zero);
+        await _player.play();
+        return;
+      }
+      _shufflePos = _shufflePos <= 0 ? _shuffleOrder.length - 1 : _shufflePos - 1;
+      _currentIndex = _shuffleOrder[_shufflePos];
+      await _loadAndPlay(_queue[_currentIndex]);
+      return;
+    }
+
     final prev = (_currentIndex - 1 + _queue.length) % _queue.length;
     _currentIndex = prev;
     await _loadAndPlay(_queue[_currentIndex]);
@@ -213,8 +241,8 @@ class AudioPlayerService extends ChangeNotifier {
         await _player.play();
         return;
       }
-      if (_shuffleBag.isEmpty) {
-        // Full pass through the queue just completed.
+      if (_shufflePos >= _shuffleOrder.length - 1) {
+        // Full pass through the shuffled order just completed.
         if (!wrap) {
           // Mirrors the non-shuffle end-of-queue stop below -- don't seek
           // here, seeking on a completed player can auto-restart playback
@@ -223,9 +251,11 @@ class AudioPlayerService extends ChangeNotifier {
           notifyListeners();
           return;
         }
-        _refillShuffleBag();
+        _reshuffleForNewPass();
+      } else {
+        _shufflePos++;
       }
-      next = _shuffleBag.removeLast();
+      next = _shuffleOrder[_shufflePos];
     } else {
       next = _currentIndex + 1;
       if (next >= _queue.length) {
@@ -352,21 +382,51 @@ class AudioPlayerService extends ChangeNotifier {
     await seek(Duration(milliseconds: ms));
   }
 
+  Future<void> setVolume(double volume) async {
+    _volume = volume.clamp(0.0, 1.0);
+    await _player.setVolume(_volume);
+    notifyListeners();
+  }
+
   void toggleShuffle() {
     _isShuffle = !_isShuffle;
     if (_isShuffle) {
-      _refillShuffleBag();
+      _startNewShufflePass();
     } else {
-      _shuffleBag = [];
+      _shuffleOrder = [];
+      _shufflePos = -1;
     }
     notifyListeners();
   }
 
-  /// Rebuilds the shuffle-bag with every queue index except the currently
-  /// playing one, in a fresh random order.
-  void _refillShuffleBag() {
-    _shuffleBag = [for (int i = 0; i < _queue.length; i++) if (i != _currentIndex) i];
-    _shuffleBag.shuffle(_rng);
+  /// Builds a fresh shuffled order for the whole queue, keeping whatever's
+  /// currently playing (_currentIndex) at the front so turning shuffle on
+  /// mid-track -- or starting a new queue with shuffle already on -- never
+  /// jumps to a different track. "Next"/"previous" then just walk this
+  /// fixed order forward/backward, so a full playlist worth of tracks each
+  /// play exactly once per pass and previous always retraces real history.
+  void _startNewShufflePass() {
+    final rest = [for (int i = 0; i < _queue.length; i++) if (i != _currentIndex) i];
+    rest.shuffle(_rng);
+    _shuffleOrder = (_currentIndex >= 0 && _currentIndex < _queue.length)
+        ? [_currentIndex, ...rest]
+        : rest;
+    _shufflePos = 0;
+  }
+
+  /// Reshuffles for a new lap once every track in the current pass has been
+  /// played (called from mid-playback, not track-start) -- avoids
+  /// immediately replaying the track that just finished back-to-back.
+  void _reshuffleForNewPass() {
+    final indices = [for (int i = 0; i < _queue.length; i++) i];
+    indices.shuffle(_rng);
+    if (indices.length > 1 && indices.first == _currentIndex) {
+      final tmp = indices[0];
+      indices[0] = indices[1];
+      indices[1] = tmp;
+    }
+    _shuffleOrder = indices;
+    _shufflePos = 0;
   }
 
   /// Cycles: none → one → all → none

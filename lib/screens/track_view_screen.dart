@@ -9,6 +9,7 @@ import '../repositories/track_repository.dart';
 import '../services/artwork_color_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/jam_service.dart';
+import '../widgets/artist_label.dart';
 import '../widgets/bluetooth_indicator.dart';
 import '../widgets/loop_mode_button.dart';
 import '../services/waveform_service.dart';
@@ -16,6 +17,7 @@ import '../widgets/nyx_toast.dart';
 import '../widgets/options_sheet.dart';
 import '../widgets/song_actions.dart';
 import '../widgets/track_thumbnail.dart';
+import '../widgets/volume_control.dart';
 import '../widgets/waveform_scrubber.dart';
 import 'lyrics_screen.dart';
 
@@ -290,8 +292,9 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      Text(
-                                        track.artist,
+                                      ArtistLabel(
+                                        artist: track.artist,
+                                        thumbnailPath: track.thumbnailPath,
                                         style: const TextStyle(
                                           fontFamily: AppFonts.sans,
                                           fontSize: 14,
@@ -514,6 +517,18 @@ class _TrackViewScreenState extends State<TrackViewScreen> {
                               ),
                             ),
                           ),
+
+                          // ── Volume (desktop only -- mobile uses OS volume) ──────────────
+                          if (context.isDesktop) ...[
+                            const SizedBox(height: 14),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 28),
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: VolumeControl(sliderWidth: 140),
+                              ),
+                            ),
+                          ],
 
                           const SizedBox(height: 20),
 

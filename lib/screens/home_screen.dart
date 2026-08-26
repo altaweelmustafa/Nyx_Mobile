@@ -11,6 +11,7 @@ import '../repositories/track_repository.dart';
 import '../services/audio_player_service.dart';
 import '../services/library_service.dart';
 import '../utils/artist_names.dart';
+import '../widgets/artist_label.dart';
 import '../widgets/responsive_card_row.dart';
 import '../widgets/song_actions.dart';
 import '../widgets/track_row_tap.dart';
@@ -511,10 +512,9 @@ class _TrackCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 2),
-            Text(
-              track.artist,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            ArtistLabel(
+              artist: track.artist,
+              thumbnailPath: track.thumbnailPath,
               style: const TextStyle(
                 fontFamily: AppFonts.sans,
                 fontFamilyFallback: AppFonts.fallback,

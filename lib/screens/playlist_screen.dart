@@ -9,6 +9,7 @@ import '../repositories/track_repository.dart';
 import '../services/audio_player_service.dart';
 import '../services/library_service.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/artist_label.dart';
 import '../widgets/collection_header.dart';
 import '../widgets/nyx_toast.dart';
 import '../widgets/options_sheet.dart';
@@ -71,6 +72,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
     setState(() => _tracks.removeAt(index));
   }
 
+  bool get _locked => widget.playlist.isLocked;
+
   void _showSongOptions(int index) {
     final track = _tracks[index];
     showSongOptionsSheet(
@@ -83,8 +86,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         if (!mounted) return;
         setState(() => _tracks[index] = track.copyWith(liked: liked));
       },
-      removeLabel: 'Remove from Playlist',
-      onRemove: () => _removeFromPlaylist(index),
+      // A locked (artist-sourced) playlist's track list can't be edited.
+      removeLabel: _locked ? null : 'Remove from Playlist',
+      onRemove: _locked ? null : () => _removeFromPlaylist(index),
     );
   }
 
@@ -100,11 +104,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
             ShareParams(text: 'Check out my playlist "$_name" on Nyx'),
           ),
         ),
-        SheetOption(
-          icon: Icons.edit_outlined,
-          label: 'Rename Playlist',
-          onTap: _renamePlaylist,
-        ),
+        if (!_locked)
+          SheetOption(
+            icon: Icons.edit_outlined,
+            label: 'Rename Playlist',
+            onTap: _renamePlaylist,
+          ),
         SheetOption(
           icon: Icons.delete_outline,
           label: 'Delete Playlist',
@@ -227,7 +232,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
             // ── Playlist header ──────────────────────────────────────────
             CollectionHeader(
               title: _name,
-              subtitle: '${_tracks.length} TRACKS',
+              subtitle: _locked
+                  ? '${_tracks.length} TRACKS · SAVED FROM ARTIST'
+                  : '${_tracks.length} TRACKS',
               thumbnailPath: _tracks.isNotEmpty ? _tracks.first.thumbnailPath : null,
               onPlayAll: _tracks.isEmpty
                   ? null
@@ -283,8 +290,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 3),
-                                      Text(
-                                        track.artist,
+                                      ArtistLabel(
+                                        artist: track.artist,
+                                        thumbnailPath: track.thumbnailPath,
                                         style: const TextStyle(
                                           fontFamily: AppFonts.sans,
                                           fontSize: 12,

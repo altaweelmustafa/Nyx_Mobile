@@ -6,6 +6,7 @@ import '../services/artwork_color_service.dart';
 import '../services/lyrics_service.dart';
 import '../services/audio_player_service.dart';
 import '../widgets/app_scaffold.dart';
+import '../widgets/artist_label.dart';
 import '../widgets/track_thumbnail.dart';
 
 class LyricsScreen extends StatefulWidget {
@@ -148,8 +149,9 @@ class _LyricsScreenState extends State<LyricsScreen> {
                 ),
               ),
               const SizedBox(height: 2),
-              Text(
-                widget.track.artist,
+              ArtistLabel(
+                artist: widget.track.artist,
+                thumbnailPath: widget.track.thumbnailPath,
                 style: const TextStyle(
                   fontFamily: AppFonts.sans,
                   fontFamilyFallback: AppFonts.fallback,

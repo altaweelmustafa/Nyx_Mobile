@@ -14,7 +14,11 @@ Future<void> addTrackToPlaylist(
   Track track,
   PlaylistRepository playlistRepo,
 ) async {
-  final playlists = await playlistRepo.getAll();
+  // A locked (artist-sourced) playlist's track list can't be edited, so it
+  // isn't a valid destination here.
+  final playlists = (await playlistRepo.getAll())
+      .where((p) => !p.isLocked)
+      .toList();
   if (!context.mounted) return;
 
   final selected = await showModalBottomSheet<Playlist>(
@@ -98,8 +102,10 @@ Future<void> showSongOptionsSheet(
   required PlaylistRepository playlistRepo,
   required bool liked,
   required ValueChanged<bool> onLikeChanged,
-  required String removeLabel,
-  required VoidCallback onRemove,
+  // Both null together omits the remove option entirely -- used for a
+  // locked (artist-sourced) playlist, whose track list can't be edited.
+  String? removeLabel,
+  VoidCallback? onRemove,
 }) {
   return showOptionsSheet(
     context,
@@ -125,20 +131,21 @@ Future<void> showSongOptionsSheet(
         label: 'Add to Playlist',
         onTap: () => addTrackToPlaylist(context, track, playlistRepo),
       ),
-      SheetOption(
-        icon: Icons.remove_circle_outline,
-        label: removeLabel,
-        destructive: true,
-        onTap: () {
-          onRemove();
-          if (!context.mounted) return;
-          NyxToast.show(
-            context,
-            removeLabel.replaceFirst('Remove', 'Removed'),
-            icon: Icons.delete_outline,
-          );
-        },
-      ),
+      if (removeLabel != null && onRemove != null)
+        SheetOption(
+          icon: Icons.remove_circle_outline,
+          label: removeLabel,
+          destructive: true,
+          onTap: () {
+            onRemove();
+            if (!context.mounted) return;
+            NyxToast.show(
+              context,
+              removeLabel.replaceFirst('Remove', 'Removed'),
+              icon: Icons.delete_outline,
+            );
+          },
+        ),
     ],
   );
 }

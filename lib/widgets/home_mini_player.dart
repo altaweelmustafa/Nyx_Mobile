@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/artwork_color_service.dart';
 import '../theme/app_theme.dart';
 import '../services/audio_player_service.dart';
+import 'artist_label.dart';
 import 'bluetooth_indicator.dart';
 import 'loop_mode_button.dart';
 import 'waveform_scrubber.dart';
@@ -134,16 +135,15 @@ class _HomeMiniPlayerState extends State<HomeMiniPlayer> {
                               ],
                             ),
                             const SizedBox(height: 2),
-                            Text(
-                              track.artist,
+                            ArtistLabel(
+                              artist: track.artist,
+                              thumbnailPath: track.thumbnailPath,
                               style: TextStyle(
                                 fontFamily: AppFonts.mono,
                                 fontFamilyFallback: AppFonts.fallback,
                                 fontSize: 12,
                                 color: Colors.white.withOpacity(0.7),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 5),
                             const BluetoothIndicator(

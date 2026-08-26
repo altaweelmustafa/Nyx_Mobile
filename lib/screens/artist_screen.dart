@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../models/playlist.dart';
 import '../models/track.dart';
 import '../repositories/artist_repository.dart';
 import '../repositories/playlist_repository.dart';
@@ -8,6 +9,7 @@ import '../repositories/track_repository.dart';
 import '../services/audio_player_service.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/collection_header.dart';
+import '../widgets/nyx_toast.dart';
 import '../widgets/song_actions.dart';
 import '../widgets/track_row_tap.dart';
 import '../widgets/track_thumbnail.dart';
@@ -31,6 +33,7 @@ class _ArtistScreenState extends State<ArtistScreen> {
   final _playlistRepo = PlaylistRepository();
   List<Track> _tracks = [];
   ArtistProfile? _profile;
+  Playlist? _savedPlaylist;
   bool _loading = true;
 
   @override
@@ -42,12 +45,33 @@ class _ArtistScreenState extends State<ArtistScreen> {
   Future<void> _load() async {
     final tracks = await _trackRepo.getByArtist(widget.artist);
     final profile = await _artistRepo.getByName(widget.artist);
+    final saved = await _playlistRepo.getBySourceArtist(widget.artist);
     if (!mounted) return;
     setState(() {
       _tracks = tracks;
       _profile = profile;
+      _savedPlaylist = saved;
       _loading = false;
     });
+  }
+
+  /// Saves this artist's current tracks as a locked playlist named after
+  /// them. One-way from here -- once saved, this button just reflects that;
+  /// removing it again is a deliberate action from the playlist itself
+  /// ("Delete Playlist"), not a second tap here.
+  Future<void> _saveAsPlaylist() async {
+    if (_savedPlaylist != null || _tracks.isEmpty) return;
+    final playlist = await _playlistRepo.createFromArtist(
+      widget.artist,
+      _tracks.map((t) => t.id).toList(),
+    );
+    if (!mounted) return;
+    setState(() => _savedPlaylist = playlist);
+    NyxToast.show(
+      context,
+      "Saved '${widget.artist}' as a playlist",
+      icon: Icons.playlist_add_check,
+    );
   }
 
   void _showSongOptions(int index) {
@@ -102,6 +126,24 @@ class _ArtistScreenState extends State<ArtistScreen> {
                             Icons.arrow_back_ios_new,
                             color: AppColors.textPrimary,
                             size: 20,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: _savedPlaylist != null
+                              ? 'Saved as Playlist'
+                              : 'Save as Playlist',
+                          onPressed: (_savedPlaylist != null || _tracks.isEmpty)
+                              ? null
+                              : _saveAsPlaylist,
+                          icon: Icon(
+                            _savedPlaylist != null
+                                ? Icons.playlist_add_check
+                                : Icons.playlist_add,
+                            color: _savedPlaylist != null
+                                ? AppColors.accent
+                                : AppColors.textPrimary,
+                            size: 22,
                           ),
                         ),
                       ],

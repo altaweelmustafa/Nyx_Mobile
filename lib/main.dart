@@ -82,10 +82,10 @@ void main() async {
     await _ensureFfmpegTmpDir();
   }
 
-  // Linux audio backend for just_audio
+  // Linux/Windows audio backend for just_audio
   JustAudioMediaKit.ensureInitialized(
     linux: true,
-    windows: false,
+    windows: true,
     android: false,
     iOS: false,
     macOS: false,
