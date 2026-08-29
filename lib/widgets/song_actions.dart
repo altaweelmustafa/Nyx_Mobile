@@ -3,6 +3,7 @@ import '../models/playlist.dart';
 import '../models/track.dart';
 import '../repositories/playlist_repository.dart';
 import '../repositories/track_repository.dart';
+import '../services/playlist_sync_service.dart';
 import '../theme/app_theme.dart';
 import 'nyx_toast.dart';
 import 'options_sheet.dart';
@@ -80,6 +81,7 @@ Future<void> addTrackToPlaylist(
 
   if (selected == null || !context.mounted) return;
   await playlistRepo.addTrack(selected.id, track.id);
+  PlaylistSyncService.instance.pushAddTrack(selected, track);
   if (!context.mounted) return;
   NyxToast.show(
     context,

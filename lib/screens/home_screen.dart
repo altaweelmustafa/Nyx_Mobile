@@ -12,6 +12,7 @@ import '../services/audio_player_service.dart';
 import '../services/library_service.dart';
 import '../utils/artist_names.dart';
 import '../widgets/artist_label.dart';
+import '../widgets/playlist_deck_card.dart';
 import '../widgets/responsive_card_row.dart';
 import '../widgets/song_actions.dart';
 import '../widgets/track_row_tap.dart';
@@ -34,6 +35,12 @@ class _RecArtistItem extends _RecItem {
   final String artist;
   final String? thumbnailPath;
   _RecArtistItem(this.artist, this.thumbnailPath);
+}
+
+class _RecPlaylistItem extends _RecItem {
+  final Playlist playlist;
+  final List<String?> thumbnails;
+  _RecPlaylistItem(this.playlist, this.thumbnails);
 }
 
 class HomeScreen extends StatefulWidget {
@@ -85,14 +92,19 @@ class _HomeScreenState extends State<HomeScreen> {
     final likedFuture = _trackRepo.getLiked();
     final mostPlayedFuture = _trackRepo.getMostPlayed(10);
     final recommendedFuture = _trackRepo.getRecentlyAddedMix(12);
+    // All playlists, not just ones saved into Your Library -- every
+    // playlist is public/discoverable via suggestions and search.
+    final allPlaylistsFuture = _playlistRepo.getAll();
 
     final playlists = await playlistsFuture;
     final liked = await likedFuture;
     final mostPlayed = await mostPlayedFuture;
     final recommended = await recommendedFuture;
+    final allPlaylists = await allPlaylistsFuture;
     final artistProfiles = await _artistRepo.getAll();
     final photoByArtist = {for (final a in artistProfiles) a.name: a.photoPath};
     final artists = _newArtistsFrom(recommended, photoByArtist);
+    final suggestedPlaylists = _pickRandomPlaylists(allPlaylists, cap: 2);
     final thumbnails = await Future.wait(
       playlists.map((p) async {
         final tracks = await _playlistRepo.getTracks(p.id);
@@ -101,6 +113,11 @@ class _HomeScreenState extends State<HomeScreen> {
           tracks.isNotEmpty ? tracks.first.thumbnailPath : null,
         );
       }),
+    );
+    final suggestedPlaylistItems = await Future.wait(
+      suggestedPlaylists.map(
+        (p) async => _RecPlaylistItem(p, await _playlistRepo.getTrackThumbnails(p.id)),
+      ),
     );
     if (!mounted) return;
     setState(() {
@@ -112,9 +129,17 @@ class _HomeScreenState extends State<HomeScreen> {
       _likedThumbnail = liked.isNotEmpty ? liked.first.thumbnailPath : null;
       _mostPlayed = mostPlayed;
       _recommended = recommended;
-      _recommendedDisplay = _mixInArtists(recommended, artists);
+      _recommendedDisplay = _mixInExtras(recommended, artists, suggestedPlaylistItems);
       _loading = false;
     });
+  }
+
+  /// Random sample of up to [cap] playlists -- reshuffled on every load
+  /// (like the artist picks) so suggestions rotate on repeat visits
+  /// instead of pinning the same handful forever.
+  List<Playlist> _pickRandomPlaylists(List<Playlist> playlists, {int cap = 2}) {
+    final shuffled = [...playlists]..shuffle(Random());
+    return shuffled.take(cap).toList();
   }
 
   /// Distinct (split) artists among [tracks] -- since [tracks] already
@@ -144,17 +169,24 @@ class _HomeScreenState extends State<HomeScreen> {
     return result.take(cap).toList();
   }
 
-  /// Splices artist cards into random positions among the recommended
-  /// tracks -- recomputed on every load so it reshuffles each visit.
-  List<_RecItem> _mixInArtists(
+  /// Splices artist and playlist cards into random positions among the
+  /// recommended tracks -- recomputed on every load so it reshuffles each
+  /// visit, which is also how playlists end up appearing in suggestions
+  /// "regularly" rather than always in the same spot.
+  List<_RecItem> _mixInExtras(
     List<Track> tracks,
     List<({String name, String? thumbnailPath})> artists,
+    List<_RecPlaylistItem> playlists,
   ) {
     final items = <_RecItem>[for (final t in tracks) _RecTrackItem(t.id)];
     final random = Random();
     for (final artist in artists) {
       final position = random.nextInt(items.length + 1);
       items.insert(position, _RecArtistItem(artist.name, artist.thumbnailPath));
+    }
+    for (final playlist in playlists) {
+      final position = random.nextInt(items.length + 1);
+      items.insert(position, playlist);
     }
     return items;
   }
@@ -266,6 +298,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           isRecommended: true,
                         ),
                         onTapArtist: _openArtist,
+                        onTapPlaylist: _openPlaylist,
                       ),
                       const SizedBox(height: 32),
                     ],
@@ -538,6 +571,7 @@ class _RecommendedRow extends StatelessWidget {
   final void Function(int index) onTapTrack;
   final void Function(int index) onOptionsTap;
   final void Function(String artist, String? thumbnailPath) onTapArtist;
+  final void Function(Playlist playlist) onTapPlaylist;
 
   const _RecommendedRow({
     required this.items,
@@ -545,6 +579,7 @@ class _RecommendedRow extends StatelessWidget {
     required this.onTapTrack,
     required this.onOptionsTap,
     required this.onTapArtist,
+    required this.onTapPlaylist,
   });
 
   @override
@@ -560,6 +595,17 @@ class _RecommendedRow extends StatelessWidget {
             name: item.artist,
             thumbnailPath: item.thumbnailPath,
             onTap: () => onTapArtist(item.artist, item.thumbnailPath),
+          ),
+        );
+        continue;
+      }
+
+      if (item is _RecPlaylistItem) {
+        cards.add(
+          PlaylistDeckCard(
+            playlist: item.playlist,
+            thumbnails: item.thumbnails,
+            onTap: () => onTapPlaylist(item.playlist),
           ),
         );
         continue;

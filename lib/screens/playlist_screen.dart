@@ -8,6 +8,7 @@ import '../repositories/playlist_repository.dart';
 import '../repositories/track_repository.dart';
 import '../services/audio_player_service.dart';
 import '../services/library_service.dart';
+import '../services/playlist_sync_service.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/artist_label.dart';
 import '../widgets/collection_header.dart';
@@ -33,12 +34,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   List<Track> _tracks = [];
   bool _loading = true;
   late String _name;
+  late bool _liked;
   LibraryService? _libSvc;
 
   @override
   void initState() {
     super.initState();
     _name = widget.playlist.name;
+    _liked = widget.playlist.liked;
     _load();
   }
 
@@ -68,11 +71,29 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   Future<void> _removeFromPlaylist(int index) async {
     final track = _tracks[index];
     await _playlistRepo.removeTrack(widget.playlist.id, track.id);
+    PlaylistSyncService.instance.pushRemoveTrack(widget.playlist, track);
     if (!mounted) return;
     setState(() => _tracks.removeAt(index));
   }
 
   bool get _locked => widget.playlist.isLocked;
+
+  /// "Add as playlist for me": makes an already-shared playlist show up in
+  /// Your Library too. It's the same underlying playlist -- edits either
+  /// device makes still apply to everyone, this just marks it as saved
+  /// locally, mirroring how a foreign playlist starts out un-liked when
+  /// PlaylistSyncService first pulls it in.
+  Future<void> _toggleLiked() async {
+    final next = !_liked;
+    await _playlistRepo.setLiked(widget.playlist.id, next);
+    if (!mounted) return;
+    setState(() => _liked = next);
+    NyxToast.show(
+      context,
+      next ? 'Added to Your Library' : 'Removed from Your Library',
+      icon: next ? Icons.playlist_add_check : Icons.playlist_remove,
+    );
+  }
 
   void _showSongOptions(int index) {
     final track = _tracks[index];
@@ -104,6 +125,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
             ShareParams(text: 'Check out my playlist "$_name" on Nyx'),
           ),
         ),
+        if (!_locked)
+          SheetOption(
+            icon: _liked ? Icons.playlist_remove : Icons.playlist_add_check,
+            label: _liked ? 'Remove from Your Library' : 'Add to Your Library',
+            onTap: _toggleLiked,
+          ),
         if (!_locked)
           SheetOption(
             icon: Icons.edit_outlined,
@@ -153,6 +180,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
     if (newName == null || newName.isEmpty || !mounted) return;
     await _playlistRepo.rename(widget.playlist.id, newName);
+    PlaylistSyncService.instance.pushRename(widget.playlist, newName);
     if (!mounted) return;
     setState(() => _name = newName);
     NyxToast.show(context, 'Playlist renamed', icon: Icons.edit_outlined);
@@ -189,6 +217,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
 
     if (confirmed != true || !mounted) return;
     await _playlistRepo.delete(widget.playlist.id);
+    PlaylistSyncService.instance.pushDelete(widget.playlist);
     if (!mounted) return;
     NyxToast.show(context, 'Playlist deleted', icon: Icons.delete_outline);
     Navigator.of(context).pop();

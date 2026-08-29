@@ -11,6 +11,13 @@ class Playlist {
   /// can't be edited, only deleted.
   final String? sourceArtist;
 
+  /// Non-null once this playlist is mirrored on the homelab server -- the
+  /// id under which every device that syncs knows it. That's what "public"
+  /// means here: any device can pull it, add/remove tracks, or add it to
+  /// its own Library. Null means either not-yet-uploaded, or a locked
+  /// artist-snapshot playlist, which never syncs.
+  final String? serverId;
+
   const Playlist({
     required this.id,
     required this.name,
@@ -18,9 +25,11 @@ class Playlist {
     required this.trackCount,
     this.liked = false,
     this.sourceArtist,
+    this.serverId,
   });
 
   bool get isLocked => sourceArtist != null;
+  bool get isShared => serverId != null;
 
   factory Playlist.fromMap(Map<String, Object?> map) => Playlist(
     id: map['id'].toString(),
@@ -29,6 +38,7 @@ class Playlist {
     trackCount: (map['track_count'] as int?) ?? 0,
     liked: (map['liked'] as int) != 0,
     sourceArtist: map['source_artist'] as String?,
+    serverId: map['server_id'] as String?,
   );
 
   Playlist copyWith({bool? liked}) => Playlist(
@@ -38,5 +48,6 @@ class Playlist {
     trackCount: trackCount,
     liked: liked ?? this.liked,
     sourceArtist: sourceArtist,
+    serverId: serverId,
   );
 }

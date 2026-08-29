@@ -14,10 +14,19 @@ class AppDatabase {
   static const _version = 1;
 
   Database? _db;
+  Future<Database>? _opening;
 
+  /// Concurrent first-callers (several repository queries firing at once
+  /// on startup, none awaited yet) must share one in-flight `_open()` --
+  /// `_db ??= await _open()` checked `_db == null` synchronously for each
+  /// caller before any of them finished opening, so multiple calls raced
+  /// into `_ensureSchema()` at once and its "add column if missing" checks
+  /// (PRAGMA table_info) saw the same missing column simultaneously,
+  /// letting more than one ALTER TABLE fire and the loser crash with
+  /// "duplicate column name".
   Future<Database> get database async {
-    _db ??= await _open();
-    return _db!;
+    if (_db != null) return _db!;
+    return _opening ??= _open().then((db) => _db = db);
   }
 
   Future<Database> _open() async {
@@ -75,6 +84,15 @@ class AppDatabase {
     final hasSourceArtist = playlistColumns.any((c) => c['name'] == 'source_artist');
     if (!hasSourceArtist) {
       await db.execute('ALTER TABLE playlists ADD COLUMN source_artist TEXT');
+    }
+    // Non-null once this playlist is mirrored on the homelab server (orc's
+    // /api/playlists) -- what makes it "public": visible to and editable
+    // from every device that syncs, not just this one. Null covers both a
+    // not-yet-uploaded local playlist and a locked artist-snapshot one
+    // (source_artist != null), which deliberately never syncs.
+    final hasServerId = playlistColumns.any((c) => c['name'] == 'server_id');
+    if (!hasServerId) {
+      await db.execute('ALTER TABLE playlists ADD COLUMN server_id TEXT');
     }
 
     final trackColumns = await db.rawQuery("PRAGMA table_info('tracks')");
@@ -227,6 +245,7 @@ class AppDatabase {
         likes         INTEGER NOT NULL DEFAULT 0,
         liked         INTEGER NOT NULL DEFAULT 1,
         source_artist TEXT,
+        server_id     TEXT,
         created_at    INTEGER NOT NULL
       )
     ''');

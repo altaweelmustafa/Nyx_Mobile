@@ -5,6 +5,7 @@ import '../models/playlist.dart';
 import '../repositories/playlist_repository.dart';
 import '../repositories/track_repository.dart';
 import '../services/library_service.dart';
+import '../services/playlist_sync_service.dart';
 import '../widgets/nyx_toast.dart';
 import '../widgets/track_thumbnail.dart';
 import 'history_screen.dart';
@@ -122,6 +123,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     if (!mounted) return;
     NyxToast.show(context, 'Playlist created', icon: Icons.playlist_add);
     final created = _playlists.firstWhere((p) => p.id == id);
+    PlaylistSyncService.instance.pushCreate(created, const []);
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => PlaylistScreen(playlist: created)),
     );

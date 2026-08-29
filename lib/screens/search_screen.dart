@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../models/playlist.dart';
 import '../models/track.dart';
+import '../repositories/playlist_repository.dart';
 import '../repositories/search_history_repository.dart';
 import '../repositories/track_repository.dart';
 import '../services/audio_player_service.dart';
 import '../widgets/artist_label.dart';
+import '../widgets/playlist_deck_card.dart';
 import '../widgets/track_row_tap.dart';
 import '../widgets/track_thumbnail.dart';
 import 'artist_screen.dart';
+import 'playlist_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -24,11 +28,14 @@ class _SearchScreenState extends State<SearchScreen> {
   String _query = '';
 
   final _trackRepo = TrackRepository();
+  final _playlistRepo = PlaylistRepository();
   final _historyRepo = SearchHistoryRepository();
 
   List<String> _history = [];
   List<Track> _results = [];
   List<({String name, String? thumbnailPath})> _artistResults = [];
+  List<Playlist> _playlistResults = [];
+  final Map<String, List<String?>> _playlistThumbnails = {};
 
   @override
   void initState() {
@@ -56,15 +63,26 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() {
         _results = [];
         _artistResults = [];
+        _playlistResults = [];
       });
       return;
     }
     final results = await _trackRepo.searchTracks(query);
     final artistResults = await _trackRepo.searchArtists(query);
+    final playlistResults = await _playlistRepo.searchPlaylists(query);
+    final playlistThumbnails = await Future.wait(
+      playlistResults.map(
+        (p) async => MapEntry(p.id, await _playlistRepo.getTrackThumbnails(p.id)),
+      ),
+    );
     if (!mounted || query != _query) return;
     setState(() {
       _results = results;
       _artistResults = artistResults;
+      _playlistResults = playlistResults;
+      _playlistThumbnails
+        ..clear()
+        ..addEntries(playlistThumbnails);
     });
   }
 
@@ -106,6 +124,12 @@ class _SearchScreenState extends State<SearchScreen> {
         builder: (_) =>
             ArtistScreen(artist: artist, thumbnailPath: thumbnailPath),
       ),
+    );
+  }
+
+  void _openPlaylist(Playlist playlist) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => PlaylistScreen(playlist: playlist)),
     );
   }
 
@@ -199,6 +223,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     ? _ResultsList(
                         results: _results,
                         artistResults: _artistResults,
+                        playlistResults: _playlistResults,
+                        playlistThumbnails: _playlistThumbnails,
                         onTap: (index) {
                           _recordSearch(_query);
                           handleTrackTap(context, _results, index);
@@ -206,6 +232,10 @@ class _SearchScreenState extends State<SearchScreen> {
                         onTapArtist: (artist, thumbnailPath) {
                           _recordSearch(_query);
                           _openArtist(artist, thumbnailPath);
+                        },
+                        onTapPlaylist: (playlist) {
+                          _recordSearch(_query);
+                          _openPlaylist(playlist);
                         },
                       )
                     : _HistoryList(
@@ -306,19 +336,25 @@ class _HistoryRow extends StatelessWidget {
 class _ResultsList extends StatelessWidget {
   final List<Track> results;
   final List<({String name, String? thumbnailPath})> artistResults;
+  final List<Playlist> playlistResults;
+  final Map<String, List<String?>> playlistThumbnails;
   final void Function(int index) onTap;
   final void Function(String artist, String? thumbnailPath) onTapArtist;
+  final void Function(Playlist playlist) onTapPlaylist;
 
   const _ResultsList({
     required this.results,
     required this.artistResults,
+    required this.playlistResults,
+    required this.playlistThumbnails,
     required this.onTap,
     required this.onTapArtist,
+    required this.onTapPlaylist,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (results.isEmpty && artistResults.isEmpty) {
+    if (results.isEmpty && artistResults.isEmpty && playlistResults.isEmpty) {
       return const Center(
         child: Text(
           'No results',
@@ -386,6 +422,39 @@ class _ResultsList extends StatelessWidget {
                         ],
                       ),
                     ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+        if (playlistResults.isNotEmpty) ...[
+          const Text(
+            'Playlists',
+            style: TextStyle(
+              fontFamily: AppFonts.sans,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 188,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: playlistResults.length,
+              itemBuilder: (context, i) {
+                final playlist = playlistResults[i];
+                return Padding(
+                  padding: EdgeInsets.only(
+                    right: i < playlistResults.length - 1 ? 16 : 0,
+                  ),
+                  child: PlaylistDeckCard(
+                    playlist: playlist,
+                    thumbnails: playlistThumbnails[playlist.id] ?? const [],
+                    onTap: () => onTapPlaylist(playlist),
                   ),
                 );
               },

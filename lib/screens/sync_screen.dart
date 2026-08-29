@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../repositories/profile_repository.dart';
 import '../services/catalog_sync_service.dart';
+import '../services/playlist_sync_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/nyx_toast.dart';
@@ -15,6 +16,7 @@ class SyncScreen extends StatefulWidget {
 class _SyncScreenState extends State<SyncScreen> {
   final _profileRepo = ProfileRepository();
   final _syncService = CatalogSyncService();
+  final _playlistSyncService = PlaylistSyncService.instance;
   final _urlController = TextEditingController();
 
   bool _loading = true;
@@ -54,17 +56,32 @@ class _SyncScreenState extends State<SyncScreen> {
 
     try {
       await _profileRepo.setServerUrl(url);
+      // Catalog first -- playlist membership is resolved by track slug, so
+      // tracks need to exist locally before playlists can be reconciled.
       final result = await _syncService.syncFromServer(url);
+      final playlistResult = await _playlistSyncService.syncFromServer(url);
       if (!mounted) return;
+      final playlistSuffix = playlistResult.uploaded + playlistResult.pulled > 0
+          ? ' Playlists: ${playlistResult.pulled} synced'
+                '${playlistResult.uploaded > 0 ? ', ${playlistResult.uploaded} shared for the first time' : ''}'
+                '${playlistResult.removed > 0 ? ', ${playlistResult.removed} removed' : ''}.'
+          : '';
       setState(() {
         _resultIsError = false;
-        _resultMessage = result.total == 0
-            ? 'Server has no tracks in its catalog yet.'
-            : 'Synced ${result.total} track${result.total == 1 ? '' : 's'} -- '
-                '${result.added} new, ${result.updated} updated'
-                '${result.removed > 0 ? ', ${result.removed} removed' : ''}.';
+        _resultMessage =
+            (result.total == 0
+                ? 'Server has no tracks in its catalog yet.'
+                : 'Synced ${result.total} track${result.total == 1 ? '' : 's'} -- '
+                      '${result.added} new, ${result.updated} updated'
+                      '${result.removed > 0 ? ', ${result.removed} removed' : ''}.') +
+            playlistSuffix;
       });
-      if (result.added > 0 || result.updated > 0 || result.removed > 0) {
+      if (result.added > 0 ||
+          result.updated > 0 ||
+          result.removed > 0 ||
+          playlistResult.uploaded > 0 ||
+          playlistResult.pulled > 0 ||
+          playlistResult.removed > 0) {
         NyxToast.show(context, 'Library synced', icon: Icons.sync);
       }
     } catch (e) {
@@ -113,9 +130,11 @@ class _SyncScreenState extends State<SyncScreen> {
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
-                      'Pulls in everything imported on the homelab server\'s catalog. Safe to run '
-                      'repeatedly -- already-synced tracks just get refreshed, never duplicated, and '
-                      'tracks removed from the server are removed here too.',
+                      'Pulls in everything imported on the homelab server\'s catalog, plus every '
+                      'shared playlist -- any device can add or remove tracks from one, and playlists '
+                      'this device already had get shared too. Safe to run repeatedly -- already-synced '
+                      'items just get refreshed, never duplicated, and anything removed from the '
+                      'server is removed here too.',
                       style: TextStyle(fontFamily: AppFonts.sans, fontSize: 13, color: AppColors.textSecondary),
                     ),
                   ),
