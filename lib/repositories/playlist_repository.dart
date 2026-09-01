@@ -42,8 +42,10 @@ class PlaylistRepository {
 
   /// Creates a locked snapshot playlist named after [artistName], containing
   /// exactly [trackIds] in order -- used by ArtistScreen's "Save as
-  /// Playlist". The snapshot doesn't stay in sync with the artist's catalog
-  /// afterward; that's what "locked" means here.
+  /// Playlist". "Locked" means renaming and manual add/remove stay blocked
+  /// (see _isLocked below); new tracks the artist gets synced in later are
+  /// still appended automatically by
+  /// TrackRepository.upsertManyFromCatalog's _appendToArtistPlaylists.
   Future<Playlist> createFromArtist(
     String artistName,
     List<String> trackIds,

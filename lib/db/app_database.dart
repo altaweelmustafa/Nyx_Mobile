@@ -79,8 +79,9 @@ class AppDatabase {
       await db.execute('ALTER TABLE playlists ADD COLUMN liked INTEGER NOT NULL DEFAULT 1');
     }
     // Non-null only for a playlist saved from an artist page ("Save as
-    // Playlist") -- a fixed snapshot of that artist's tracks at save time,
-    // named after the artist and locked from further edits.
+    // Playlist") -- named after the artist and locked against renaming or
+    // manual add/remove, but new tracks synced in for this artist later
+    // still get appended (TrackRepository._appendToArtistPlaylists).
     final hasSourceArtist = playlistColumns.any((c) => c['name'] == 'source_artist');
     if (!hasSourceArtist) {
       await db.execute('ALTER TABLE playlists ADD COLUMN source_artist TEXT');

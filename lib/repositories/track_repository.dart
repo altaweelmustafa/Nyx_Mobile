@@ -300,6 +300,13 @@ class TrackRepository {
   /// cost. liked/play_count/liked_at are never touched, so re-syncing never
   /// resets local state. All actual writes happen inside one transaction.
   ///
+  /// A genuinely new track also gets appended to any locked artist-snapshot
+  /// playlist (see PlaylistRepository.createFromArtist) whose source_artist
+  /// matches one of the track's (split) artist names -- otherwise "Save as
+  /// Playlist" quietly drifts out of date every time the artist gets a new
+  /// upload. That's the only way a locked playlist's membership ever
+  /// changes; renaming/manual add/remove stay blocked.
+  ///
   /// Deliberately does NOT call LibraryService.notifyChanged() itself --
   /// CatalogSyncService notifies once after the whole sync (this +
   /// deleteMissingFromCatalog) finishes, not per track.
@@ -332,6 +339,7 @@ class TrackRepository {
             'created_at': DateTime.now().millisecondsSinceEpoch,
           });
           await _syncTrackArtists(txn, id, entry.artist);
+          await _appendToArtistPlaylists(txn, id, entry.artist);
           added++;
           continue;
         }
@@ -376,6 +384,40 @@ class TrackRepository {
       await db.insert(
         'track_artists',
         {'track_id': trackId, 'artist_name': name},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+  }
+
+  /// Appends a newly-synced track to every locked artist-snapshot playlist
+  /// (playlists.source_artist != null) matching one of [artist]'s (split)
+  /// names, at the end of that playlist's track list. A track credited to
+  /// "Grimes & Lizzy Wizzy" lands in both artists' saved playlists, same as
+  /// it shows up on both artist pages. No-op if neither artist has one.
+  Future<void> _appendToArtistPlaylists(
+    DatabaseExecutor db,
+    int trackId,
+    String artist,
+  ) async {
+    final names = splitArtists(artist);
+    if (names.isEmpty) return;
+    final placeholders = List.filled(names.length, '?').join(',');
+    final playlists = await db.query(
+      'playlists',
+      columns: ['id'],
+      where: 'source_artist IN ($placeholders)',
+      whereArgs: names,
+    );
+    for (final row in playlists) {
+      final playlistId = row['id'] as int;
+      final result = await db.rawQuery(
+        'SELECT COALESCE(MAX(position), -1) AS maxPos FROM playlist_tracks WHERE playlist_id = ?',
+        [playlistId],
+      );
+      final nextPosition = (result.first['maxPos'] as int) + 1;
+      await db.insert(
+        'playlist_tracks',
+        {'playlist_id': playlistId, 'track_id': trackId, 'position': nextPosition},
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
     }
