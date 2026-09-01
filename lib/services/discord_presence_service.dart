@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 
+import '../config.dart';
 import '../models/track.dart';
 import 'audio_player_service.dart';
 
@@ -80,19 +81,26 @@ class DiscordPresenceService {
 
   Future<void> _connect() async {
     if (_connecting || _socket != null) return;
-    if (!(Platform.isLinux || Platform.isMacOS)) return; // Windows named pipes: not implemented
+    if (!(Platform.isLinux || Platform.isMacOS)) {
+      debugPrint('DiscordPresenceService: unsupported platform, not attempting to connect.');
+      return; // Windows named pipes: not implemented
+    }
 
     _connecting = true;
+    final tried = <String>[];
     try {
       for (final dir in _candidateDirs()) {
         for (var i = 0; i < 10; i++) {
+          final path = '$dir/discord-ipc-$i';
+          tried.add(path);
           try {
             final socket = await Socket.connect(
-              InternetAddress('$dir/discord-ipc-$i', type: InternetAddressType.unix),
+              InternetAddress(path, type: InternetAddressType.unix),
               0,
             );
             _socket = socket;
             _ready = false;
+            debugPrint('DiscordPresenceService: connected at $path, sending handshake.');
             socket.listen(_onData, onDone: _onDisconnected, onError: (_) => _onDisconnected());
             _sendHandshake();
             return;
@@ -101,6 +109,9 @@ class DiscordPresenceService {
           }
         }
       }
+      debugPrint(
+        'DiscordPresenceService: no Discord IPC socket found. Tried: ${tried.join(', ')}',
+      );
     } finally {
       _connecting = false;
       // Discord wasn't running (or hadn't opened its IPC socket yet) -- keep
@@ -112,8 +123,10 @@ class DiscordPresenceService {
   }
 
   /// Directories Discord's desktop client is known to create its IPC socket
-  /// in, in the order it tries them itself -- plus the Linux snap package's
-  /// sandboxed variant, which nests everything under an extra `snap.discord/`.
+  /// in, in the order it tries them itself -- plus the sandboxed variants
+  /// used by Linux's Snap (`snap.discord/`) and Flatpak
+  /// (`app/com.discordapp.Discord/`) packages, each of which nests the
+  /// socket under an extra path segment inside the runtime dir.
   List<String> _candidateDirs() {
     final env = Platform.environment;
     final bases = [
@@ -124,11 +137,16 @@ class DiscordPresenceService {
       '/tmp',
     ].whereType<String>().toSet();
     return [
-      for (final base in bases) ...[base, '$base/snap.discord'],
+      for (final base in bases) ...[
+        base,
+        '$base/snap.discord',
+        '$base/app/com.discordapp.Discord',
+      ],
     ];
   }
 
   void _onDisconnected() {
+    debugPrint('DiscordPresenceService: disconnected from Discord.');
     _socket = null;
     _ready = false;
     _reconnectTimer ??= Timer.periodic(const Duration(seconds: 20), (_) => _connect());
@@ -146,12 +164,20 @@ class DiscordPresenceService {
   void _send(int opcode, Map<String, Object?> payload) {
     final socket = _socket;
     if (socket == null) return;
-    final body = utf8.encode(jsonEncode(payload));
-    final header = ByteData(8)
-      ..setInt32(0, opcode, Endian.little)
-      ..setInt32(4, body.length, Endian.little);
-    socket.add(header.buffer.asUint8List());
-    socket.add(body);
+    try {
+      final body = utf8.encode(jsonEncode(payload));
+      final header = ByteData(8)
+        ..setInt32(0, opcode, Endian.little)
+        ..setInt32(4, body.length, Endian.little);
+      socket.add(header.buffer.asUint8List());
+      socket.add(body);
+    } catch (e) {
+      // e.g. a broken pipe if Discord quit between the last successful read
+      // and this write -- _onDisconnected (from the socket's own onError/
+      // onDone) handles reconnection; this just stops it from becoming an
+      // uncaught exception inside a ChangeNotifier listener callback.
+      debugPrint('DiscordPresenceService: send failed: $e');
+    }
   }
 
   void _onData(Uint8List chunk) {
@@ -173,11 +199,18 @@ class DiscordPresenceService {
     try {
       final json = jsonDecode(payload) as Map<String, Object?>;
       if (json['evt'] == 'READY') {
+        debugPrint('DiscordPresenceService: READY, client_id accepted.');
         _ready = true;
         // A track may already have started playing before Discord finished
         // connecting -- push the current state now instead of waiting for
         // the next play/pause/track-change event.
         _pushActivity(force: true);
+      } else if (json['evt'] == 'ERROR') {
+        // e.g. {"code":4000,"message":"Invalid Client ID"} -- most likely
+        // cause: kDiscordClientId in config.dart isn't a real application id.
+        debugPrint('DiscordPresenceService: Discord returned an error: ${json['data']}');
+      } else {
+        debugPrint('DiscordPresenceService: received $json');
       }
     } catch (e) {
       debugPrint('DiscordPresenceService: bad frame: $e');
@@ -189,10 +222,24 @@ class DiscordPresenceService {
   void _setActivity(Track? track, bool isPlaying, Duration position) {
     if (!_ready) return; // _onPlayerChanged runs again once READY arrives
 
-    final thumbnail = track?.thumbnailPath;
+    // Per-track cover art was tried and dropped: Discord doesn't load an
+    // external image URL directly, it fetches it server-side through its
+    // own media proxy to cache it -- confirmed live that this returns a
+    // 502 for our homelab's Tailscale-private address, since Discord's
+    // servers (unlike this app's own devices) aren't on that network. A
+    // fixed art asset uploaded to the Discord application instead (Rich
+    // Presence -> Art Assets in the dev portal) needs no public exposure.
     final activity = track == null
         ? null
         : {
+            // type 2 = LISTENING -- renders as "Listening to Nyx" instead of
+            // the type-0 default "Playing Nyx", and switches the small
+            // controller glyph Discord shows elsewhere (friends list, etc.)
+            // to a music-note one. Confirmed live against a real Discord
+            // client that a non-partnered app is actually allowed to set
+            // this (it's echoed back as sent, not silently coerced to 0).
+            'type': 2,
+            'name': 'Nyx',
             'details': track.title,
             'state': track.artist,
             if (isPlaying)
@@ -200,12 +247,17 @@ class DiscordPresenceService {
                 'start': DateTime.now().subtract(position).millisecondsSinceEpoch,
               },
             'assets': {
-              if (thumbnail != null && thumbnail.startsWith('http')) 'large_image': thumbnail,
-              'large_text': track.artist,
+              'large_image': kDiscordLargeImageKey,
+              'large_text': 'Nyx',
             },
             'instance': false,
           };
 
+    debugPrint(
+      track == null
+          ? 'DiscordPresenceService: clearing activity'
+          : 'DiscordPresenceService: setting activity -- ${track.title} / ${track.artist}',
+    );
     _send(1, {
       'cmd': 'SET_ACTIVITY',
       'args': {'pid': pid, 'activity': activity},
