@@ -9,6 +9,7 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:window_manager/window_manager.dart';
+import 'config.dart';
 import 'theme/app_theme.dart';
 import 'models/track.dart';
 import 'screens/start_screen.dart';
@@ -16,6 +17,7 @@ import 'screens/track_view_screen.dart';
 import 'services/audio_player_service.dart';
 import 'services/bluetooth_route_service.dart';
 import 'services/deep_link_service.dart';
+import 'services/discord_presence_service.dart';
 import 'services/jam_service.dart';
 import 'services/library_service.dart';
 import 'services/nyx_audio_handler.dart';
@@ -93,6 +95,13 @@ void main() async {
   );
 
   final playerService = AudioPlayerService();
+
+  // Discord Rich Presence -- only meaningful where a Discord desktop client
+  // can be running alongside brager to receive it over its local IPC socket;
+  // no equivalent channel exists on Android/iOS. See DiscordPresenceService.
+  if (_isDesktopPlatform) {
+    DiscordPresenceService(playerService, clientId: kDiscordClientId).start();
+  }
 
   // Runs playback in a foreground service with a media notification / lock
   // screen controls, so it keeps going after the screen locks or the app is
