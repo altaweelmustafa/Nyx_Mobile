@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../db/app_database.dart';
 import '../repositories/profile_repository.dart';
 import '../services/catalog_sync_service.dart';
+import '../services/library_service.dart';
 import '../services/playlist_sync_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
@@ -95,6 +98,25 @@ class _SyncScreenState extends State<SyncScreen> {
     }
   }
 
+  /// Web only: swaps this browser's library for the desktop snapshot.
+  Future<void> _restoreDesktopLibrary() async {
+    setState(() {
+      _syncing = true;
+      _resultMessage = null;
+    });
+    final restored = await AppDatabase.instance.restoreWebSnapshot();
+    if (restored) LibraryService.instance.notifyChanged();
+    if (!mounted) return;
+    setState(() {
+      _syncing = false;
+      _resultIsError = !restored;
+      _resultMessage = restored
+          ? 'Restored your desktop library -- liked songs, playlists and profile.'
+          : 'No desktop library on the server yet (run scripts/publish_library.sh).';
+    });
+    if (restored) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
@@ -173,6 +195,14 @@ class _SyncScreenState extends State<SyncScreen> {
                           )
                         : const Text('Sync Now'),
                   ),
+                  if (kIsWeb) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: _syncing ? null : _restoreDesktopLibrary,
+                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                      child: const Text('Restore Desktop Library'),
+                    ),
+                  ],
                   if (_resultMessage != null) ...[
                     const SizedBox(height: 16),
                     Text(

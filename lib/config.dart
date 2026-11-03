@@ -1,6 +1,21 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 /// Homelab server hosting the shared track catalog (audio/images/lyrics)
 /// and orc's import pipeline. Reachable over Tailscale.
-const kDefaultServerUrl = 'http://100.105.90.110:8086';
+///
+/// The web build is served by a proxy in front of that same server (see
+/// deploy/web), so it uses the address the page was loaded from instead.
+String get kDefaultServerUrl => kIsWeb ? Uri.base.origin : kHomelabServerUrl;
+
+/// The homelab server's direct address, as stored in the desktop/Android
+/// library's track URLs.
+const kHomelabServerUrl = 'http://100.105.90.110:8086';
+
+/// Web only: a copy of the desktop library (liked songs, playlists, profile),
+/// put on the server by scripts/publish_library.sh. A fresh web install
+/// starts from it; Sync Library can restore it again later.
+const kWebLibrarySnapshot = 'library/brager.db';
+const kWebLibraryAvatar = 'library/avatar.jpg';
 
 /// Shown on the Settings screen -- keep in sync with pubspec.yaml's `version`.
 const kAppVersion = '1.0.0';

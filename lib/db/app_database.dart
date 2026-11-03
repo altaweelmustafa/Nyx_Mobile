@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -30,8 +33,13 @@ class AppDatabase {
   }
 
   Future<Database> _open() async {
-    final dir = await getApplicationSupportDirectory();
-    final path = p.join(dir.path, _fileName);
+    // On web there's no filesystem; the name just keys the IndexedDB store.
+    final path = kIsWeb
+        ? _fileName
+        : p.join((await getApplicationSupportDirectory()).path, _fileName);
+    if (kIsWeb && !await databaseExists(path)) {
+      await _restoreWebSnapshot(path);
+    }
 
     final db = await openDatabase(
       path,
@@ -44,6 +52,55 @@ class AppDatabase {
     // idempotent, and fixes installs whose on-disk schema predates a column.
     await _ensureSchema(db);
     return db;
+  }
+
+  /// Web only: replaces this browser's library with the desktop snapshot on
+  /// the server (see kWebLibrarySnapshot). False if there's no snapshot.
+  Future<bool> restoreWebSnapshot() async {
+    final db = await database;
+    await db.close();
+    _db = null;
+    _opening = null;
+    final restored = await _restoreWebSnapshot(_fileName);
+    await database;
+    return restored;
+  }
+
+  Future<bool> _restoreWebSnapshot(String path) async {
+    final Uint8List bytes;
+    try {
+      final response = await Dio().get<List<int>>(
+        Uri.base.resolve(kWebLibrarySnapshot).toString(),
+        options: Options(responseType: ResponseType.bytes),
+      );
+      bytes = Uint8List.fromList(response.data!);
+    } catch (_) {
+      return false;
+    }
+    await databaseFactory.writeDatabaseBytes(path, bytes);
+
+    // The desktop library points at the homelab server directly; the web
+    // build reaches it through the page's own address instead.
+    final origin = Uri.base.origin;
+    final db = await openDatabase(path);
+    for (final (table, column) in const [
+      ('tracks', 'audio_url'),
+      ('tracks', 'thumbnail_path'),
+      ('tracks', 'lyrics_path'),
+      ('artists', 'photo_path'),
+    ]) {
+      await db.rawUpdate(
+        'UPDATE $table SET $column = REPLACE($column, ?, ?)',
+        [kHomelabServerUrl, origin],
+      );
+    }
+    await db.rawUpdate(
+      'UPDATE profile SET server_url = ?, '
+      'avatar_path = CASE WHEN avatar_path IS NULL THEN NULL ELSE ? END',
+      [origin, Uri.base.resolve(kWebLibraryAvatar).toString()],
+    );
+    await db.close();
+    return true;
   }
 
   Future<void> _ensureSchema(Database db) async {

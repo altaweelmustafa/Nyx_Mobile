@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Detects whether this device currently has a Tailscale interface up, by
 /// checking for a local IPv4 address in Tailscale's CGNAT range
@@ -13,6 +14,9 @@ class TailnetService {
 
   /// The device's current Tailscale IP, or null if not connected.
   static Future<String?> currentTailnetIp() async {
+    // The web build is only served on the server's Tailscale address, so
+    // having loaded the page at all means this device is on the tailnet.
+    if (kIsWeb) return Uri.base.host;
     try {
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,

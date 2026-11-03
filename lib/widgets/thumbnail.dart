@@ -30,7 +30,7 @@ class Thumbnail extends StatelessWidget {
 
 class CircleThumbnail extends StatelessWidget {
   final double size;
-  final String? imagePath; // local filesystem path, e.g. the saved avatar
+  final String? imagePath; // local file path (saved avatar), or a URL on web
 
   const CircleThumbnail({super.key, required this.size, this.imagePath});
 
@@ -40,7 +40,13 @@ class CircleThumbnail extends StatelessWidget {
       child: SizedBox(
         width: size,
         height: size,
-        child: imagePath != null
+        child: imagePath != null && imagePath!.startsWith('http')
+            ? Image.network(
+                imagePath!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const ColoredBox(color: AppColors.placeholder),
+              )
+            : imagePath != null
             ? Image.file(
                 File(imagePath!),
                 fit: BoxFit.cover,

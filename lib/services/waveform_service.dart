@@ -22,7 +22,7 @@ class WaveformService {
     String? audioUrl, {
     int barCount = 200,
   }) async {
-    if (!Platform.isAndroid && !Platform.isIOS && !Platform.isMacOS) {
+    if (kIsWeb || !Platform.isAndroid && !Platform.isIOS && !Platform.isMacOS) {
       // just_waveform has no Linux/Windows decoder -- those platforms keep
       // the animated fallback in WaveformScrubber, same as before.
       return null;

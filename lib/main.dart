@@ -1,15 +1,14 @@
-import 'dart:ffi' as ffi;
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:audio_service/audio_service.dart';
-import 'package:ffi/ffi.dart' as pkg_ffi;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:window_manager/window_manager.dart';
 import 'config.dart';
+import 'platform_init_io.dart'
+    if (dart.library.js_interop) 'platform_init_web.dart';
 import 'theme/app_theme.dart';
 import 'models/track.dart';
 import 'screens/start_screen.dart';
@@ -37,56 +36,15 @@ void pushSharedTrack(Track track) {
 /// window_manager only has real desktop implementations on these three --
 /// on Android/iOS it's a no-op window concept that doesn't apply.
 bool get _isDesktopPlatform =>
-    Platform.isLinux || Platform.isWindows || Platform.isMacOS;
-
-/// libmpv's ffmpeg backend (used for the Linux audio backend below) resolves
-/// its on-disk stream cache directory the same way any C program would --
-/// $TMPDIR, falling back to /tmp -- which can be unset or unwritable
-/// depending on how the app was launched, producing a repeating
-/// "lavf: Failed to create file cache" error on every track and, after
-/// enough of those pile up, a demuxer that stops responding to play/pause.
-/// Pointing TMPDIR at the app's own (guaranteed-writable) temp dir before
-/// the audio backend initializes sidesteps that entirely.
-Future<void> _ensureFfmpegTmpDir() async {
-  final dir = await getTemporaryDirectory();
-  await dir.create(recursive: true);
-
-  final setenv = ffi.DynamicLibrary.process()
-      .lookupFunction<
-        ffi.Int32 Function(
-          ffi.Pointer<pkg_ffi.Utf8>,
-          ffi.Pointer<pkg_ffi.Utf8>,
-          ffi.Int32,
-        ),
-        int Function(ffi.Pointer<pkg_ffi.Utf8>, ffi.Pointer<pkg_ffi.Utf8>, int)
-      >('setenv');
-
-  final name = 'TMPDIR'.toNativeUtf8();
-  final value = dir.path.toNativeUtf8();
-  try {
-    setenv(name, value, 1);
-  } finally {
-    pkg_ffi.calloc.free(name);
-    pkg_ffi.calloc.free(value);
-  }
-}
+    !kIsWeb && (Platform.isLinux || Platform.isWindows || Platform.isMacOS);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // sqflite only talks to the platform's native SQLite on Android/iOS/macOS;
-  // Linux/Windows need the FFI-backed implementation instead.
-  if (Platform.isLinux || Platform.isWindows) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
-
-  if (Platform.isLinux) {
-    await _ensureFfmpegTmpDir();
-  }
+  await initPlatform();
 
   // Linux/Windows audio backend for just_audio
-  JustAudioMediaKit.ensureInitialized(
+  if (!kIsWeb) JustAudioMediaKit.ensureInitialized(
     linux: true,
     windows: true,
     android: false,
@@ -107,7 +65,7 @@ void main() async {
   // screen controls, so it keeps going after the screen locks or the app is
   // backgrounded. Android only -- there's no audio_service platform backend
   // wired up for the desktop targets this app also builds for.
-  if (Platform.isAndroid) {
+  if (!kIsWeb && Platform.isAndroid) {
     await AudioService.init(
       builder: () => NyxAudioHandler(playerService),
       config: const AudioServiceConfig(

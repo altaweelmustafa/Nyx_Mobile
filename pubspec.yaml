@@ -58,6 +58,7 @@ dependencies:
   window_manager: ^0.5.2
   dbus: ^0.7.13
   app_links: ^7.2.1
+  sqflite_common_ffi_web: ^1.2.0
 
 dev_dependencies:
   flutter_test:
