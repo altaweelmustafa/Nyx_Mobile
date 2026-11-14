@@ -4,6 +4,7 @@ import '../config.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/nyx_toast.dart';
+import 'snack_screen.dart';
 import 'sync_screen.dart';
 
 /// Minimal settings -- just the handful of things that actually need a
@@ -76,6 +77,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => Navigator.of(
                 context,
               ).push(MaterialPageRoute(builder: (_) => const SyncScreen())),
+            ),
+
+            const SizedBox(height: 24),
+            const _SectionLabel('CONNECTIONS'),
+            _SettingsRow(
+              icon: Icons.link,
+              title: 'Snack',
+              subtitle: 'Show what you\'re listening to on your profile',
+              onTap: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SnackScreen())),
             ),
 
             const SizedBox(height: 24),

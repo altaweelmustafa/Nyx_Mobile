@@ -17,6 +17,7 @@ import 'services/audio_player_service.dart';
 import 'services/bluetooth_route_service.dart';
 import 'services/deep_link_service.dart';
 import 'services/discord_presence_service.dart';
+import 'services/snack_presence_service.dart';
 import 'services/jam_service.dart';
 import 'services/library_service.dart';
 import 'services/nyx_audio_handler.dart';
@@ -60,6 +61,9 @@ void main() async {
   if (_isDesktopPlatform) {
     DiscordPresenceService(playerService, clientId: kDiscordClientId).start();
   }
+
+  // "Listening to Nyx" on the Snack profile -- every platform, incl. web.
+  SnackPresenceService.instance.start(playerService);
 
   // Runs playback in a foreground service with a media notification / lock
   // screen controls, so it keeps going after the screen locks or the app is
